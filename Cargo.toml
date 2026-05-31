@@ -6,7 +6,7 @@ description = "A Native32 game emulator written in Rust"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
-minifb = "0.27"
+minifb = "0.28"
 rodio = { version = "0.19", features = ["mp3"] }
 anyhow = "1"
 thiserror = "2"
