@@ -1,5 +1,8 @@
 # Native32 Emulator
 
+[![CI](https://github.com/jiangxincode/Native32Emu/actions/workflows/ci.yml/badge.svg)](https://github.com/jiangxincode/Native32Emu/actions/workflows/ci.yml)
+[![SonarQube Analysis](https://github.com/jiangxincode/Native32Emu/actions/workflows/sonar-report.yml/badge.svg)](https://github.com/jiangxincode/Native32Emu/actions/workflows/sonar-report.yml)
+
 A Native32 game emulator written in Rust, based on the [n32emu](https://github.com/gatecat/n32emu) Python reference implementation.
 
 Native32 is a game format developed by Sunplus for DVD player and TV chipsets (circa 2005–2011). Games use `.smf`, `.sgm`, or `.ssl` file extensions and feature a stack-based, ActionScript-like virtual machine with raster graphics.

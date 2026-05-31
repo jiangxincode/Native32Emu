@@ -1,0 +1,166 @@
+name: Nightly Build
+
+# Build native binaries every night and publish them as a rolling
+# `nightly-build` GitHub prerelease, so users can always grab the
+# latest from master without waiting for a tagged version.
+#
+# Triggers:
+#   - Cron at 20:00 UTC (04:00 Beijing) every day.
+#   - Manual workflow_dispatch.
+#   - Every push to master (so the rolling release always reflects HEAD).
+
+on:
+  schedule:
+    - cron: "0 20 * * *"
+  workflow_dispatch:
+  push:
+    branches: [master]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact: native32-emu-linux-x86_64
+          - platform: ubuntu-22.04
+            target: aarch64-unknown-linux-gnu
+            artifact: native32-emu-linux-aarch64
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            artifact: native32-emu-macos-x86_64
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            artifact: native32-emu-macos-aarch64
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: native32-emu-windows-x86_64
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Compute version metadata
+        id: ver
+        shell: bash
+        run: |
+          echo "DATE=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+          echo "DATETIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
+          echo "SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          key: nightly-${{ matrix.target }}
+
+      - name: Install Linux build dependencies
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libx11-dev libxkbcommon-dev
+        timeout-minutes: 10
+
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf ../../../${{ matrix.artifact }}.tar.gz native32-emu
+          cd ../../..
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cd target/${{ matrix.target }}/release
+          7z a ../../../${{ matrix.artifact }}.zip native32-emu.exe
+          cd ../../..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.*
+          retention-days: 7
+
+  release:
+    name: Publish Nightly Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Compute version metadata
+        id: ver
+        shell: bash
+        run: |
+          echo "DATE=$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
+          echo "DATETIME=$(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> "$GITHUB_OUTPUT"
+          echo "SHORT_SHA=$(echo "${{ github.sha }}" | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Flatten artifacts
+        shell: bash
+        run: |
+          mkdir -p release-assets
+          find artifacts -type f \( \
+            -name '*.tar.gz' -o \
+            -name '*.zip' \
+          \) -exec cp {} release-assets/ \;
+          ls -la release-assets
+
+      - name: Recreate nightly-build release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          DATE: ${{ steps.ver.outputs.DATE }}
+          DATETIME: ${{ steps.ver.outputs.DATETIME }}
+          SHORT_SHA: ${{ steps.ver.outputs.SHORT_SHA }}
+        shell: bash
+        run: |
+          # Delete previous rolling release + tag
+          gh release delete nightly-build --repo "$REPO" --yes --cleanup-tag 2>/dev/null || true
+          gh api -X DELETE "repos/$REPO/git/refs/tags/nightly-build" 2>/dev/null || true
+
+          notes=$(cat <<EOF
+          Automated nightly build — **for testing only**.
+
+          - Built: $DATETIME
+          - Commit: [\`$SHORT_SHA\`](https://github.com/$REPO/commit/${{ github.sha }})
+          - Platforms: Windows x86_64, macOS x86_64/aarch64, Linux x86_64/aarch64
+
+          ⚠️ Unsigned build: Windows SmartScreen / macOS Gatekeeper may block on first launch.
+          EOF
+          )
+
+          gh release create nightly-build \
+            --repo "$REPO" \
+            --target "${{ github.sha }}" \
+            --title "Nightly Build $DATE ($SHORT_SHA)" \
+            --notes "$notes" \
+            --prerelease \
+            release-assets/*

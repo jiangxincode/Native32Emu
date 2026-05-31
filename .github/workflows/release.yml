@@ -1,0 +1,114 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            artifact: native32-emu-linux-x86_64
+          - platform: ubuntu-22.04
+            target: aarch64-unknown-linux-gnu
+            artifact: native32-emu-linux-aarch64
+            args: "--features cross"
+          - platform: macos-latest
+            target: x86_64-apple-darwin
+            artifact: native32-emu-macos-x86_64
+          - platform: macos-latest
+            target: aarch64-apple-darwin
+            artifact: native32-emu-macos-aarch64
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact: native32-emu-windows-x86_64
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Install Linux build dependencies
+        if: startsWith(matrix.platform, 'ubuntu')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libx11-dev libxkbcommon-dev
+
+      - name: Install cross-compilation tools
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package (Unix)
+        if: runner.os != 'Windows'
+        run: |
+          cd target/${{ matrix.target }}/release
+          tar czf ../../../${{ matrix.artifact }}.tar.gz native32-emu
+          cd ../../..
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd target/${{ matrix.target }}/release
+          7z a ../../../${{ matrix.artifact }}.zip native32-emu.exe
+          cd ../../..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifact }}.*
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: false
+          name: "Native32 Emulator ${{ github.ref_name }}"
+          body: |
+            Native32 Emulator ${{ github.ref_name }}
+
+            ## Downloads
+            - **Linux x86_64**: `native32-emu-linux-x86_64.tar.gz`
+            - **Linux aarch64**: `native32-emu-linux-aarch64.tar.gz`
+            - **macOS x86_64**: `native32-emu-macos-x86_64.tar.gz`
+            - **macOS aarch64**: `native32-emu-macos-aarch64.tar.gz`
+            - **Windows x86_64**: `native32-emu-windows-x86_64.zip`
+          files: artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
