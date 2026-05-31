@@ -1,5 +1,7 @@
 // Renderer: draws the current frame's visible objects sorted by depth.
 
+use std::path::Path;
+
 use crate::file_loader::{FrameObject, Native32Reader, ObjectType};
 use crate::image_decoder::RgbaImage;
 use crate::sprite_system::SpriteSystem;
@@ -112,5 +114,22 @@ impl Renderer {
                 self.buffer[(dy as u32 * self.width + dx as u32) as usize] = src_pixel;
             }
         }
+    }
+
+    /// Save the current buffer as a PNG screenshot.
+    pub fn save_screenshot(&self, path: &Path) -> anyhow::Result<()> {
+        let mut img = image::RgbaImage::new(self.width, self.height);
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let pixel = self.buffer[(y * self.width + x) as usize];
+                let r = ((pixel >> 16) & 0xFF) as u8;
+                let g = ((pixel >> 8) & 0xFF) as u8;
+                let b = (pixel & 0xFF) as u8;
+                let a = ((pixel >> 24) & 0xFF) as u8;
+                img.put_pixel(x, y, image::Rgba([r, g, b, a]));
+            }
+        }
+        img.save(path)?;
+        Ok(())
     }
 }

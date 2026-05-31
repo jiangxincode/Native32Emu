@@ -621,6 +621,9 @@ fn main() -> Result<()> {
     let frame_duration = Duration::from_millis(1000 / 30);
 
     // Main emulation loop
+    let mut frame_count: u32 = 0;
+    let screenshot_path = cli.screenshot.clone();
+
     while window.is_open() && !window.is_key_down(minifb::Key::Escape) {
         let frame_start = Instant::now();
 
@@ -649,6 +652,17 @@ fn main() -> Result<()> {
 
         // Update time
         emu.time_ms += 1000 / 30;
+        frame_count += 1;
+
+        // Take screenshot if requested
+        if let Some(ref path) = screenshot_path {
+            if frame_count >= cli.screenshot_frames {
+                emu.renderer.save_screenshot(path)
+                    .context("Failed to save screenshot")?;
+                log::info!("Screenshot saved to: {}", path.display());
+                break;
+            }
+        }
 
         // Frame timing
         let elapsed = frame_start.elapsed();

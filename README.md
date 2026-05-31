@@ -45,6 +45,8 @@ cargo run --release -- path/to/game.smf
 | `-s, --scale <1-16>` | Integer scaling factor | `1` |
 | `-f, --fullscreen` | Run in fullscreen mode | off |
 | `-v, --volume <0-100>` | Volume level (0 = mute, 100 = original) | `100` |
+| `-S, --screenshot <PATH>` | Take a screenshot and exit (saves as PNG) | — |
+| `--screenshot-frames <N>` | Frames to run before screenshot | `30` |
 | `--debug` | Enable debug/development mode | off |
 | `--remap <keycode:key>` | Remap a Native32 keycode to a physical key | — |
 
@@ -70,6 +72,9 @@ cargo run -- --remap "0x4000:space" native32_game/FHUI.smf
 
 # Fullscreen mode
 cargo run -- --fullscreen native32_game/EACT/EBBLADE.smf
+
+# Take a screenshot after 30 frames and exit
+cargo run -- --screenshot screenshot.png --screenshot-frames 30 native32_game/EACT/EBBLADE.smf
 ```
 
 ## Architecture
@@ -244,7 +249,7 @@ All 84 Native32 games in the test suite load and run without fatal errors. Each 
 ## Acknowledgments
 
 - [n32emu](https://github.com/gatecat/n32emu) by Myrtle Shah — the Python reference implementation this emulator is based on
-- [BootlegGames Wiki](http://bootleggames.wikia.com/wiki/Native_32) — hardware documentation and game catalog
+- [BootlegGames Wiki](https://bootleggames.fandom.com/wiki/Native_32) — hardware documentation and game catalog
 
 ## License
 

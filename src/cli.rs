@@ -30,6 +30,14 @@ pub struct Cli {
     /// Key remapping in format "keycode:key" (e.g., "0x0200:a")
     #[arg(long = "remap", value_name = "KEYCODE:KEY")]
     pub key_remappings: Vec<String>,
+
+    /// Take a screenshot after N frames and exit (saves as PNG)
+    #[arg(short = 'S', long = "screenshot", value_name = "PATH")]
+    pub screenshot: Option<PathBuf>,
+
+    /// Number of frames to run before taking screenshot (default: 30)
+    #[arg(long = "screenshot-frames", default_value = "30")]
+    pub screenshot_frames: u32,
 }
 
 impl Cli {
