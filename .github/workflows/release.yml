@@ -18,10 +18,6 @@ jobs:
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             artifact: native32-emu-linux-x86_64
-          - platform: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            artifact: native32-emu-linux-aarch64
-            args: "--features cross"
           - platform: macos-latest
             target: x86_64-apple-darwin
             artifact: native32-emu-macos-x86_64
@@ -53,12 +49,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y libasound2-dev libx11-dev libxkbcommon-dev
-
-      - name: Install cross-compilation tools
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}

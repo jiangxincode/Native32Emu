@@ -29,9 +29,6 @@ jobs:
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             artifact: native32-emu-linux-x86_64
-          - platform: ubuntu-22.04
-            target: aarch64-unknown-linux-gnu
-            artifact: native32-emu-linux-aarch64
           - platform: macos-latest
             target: x86_64-apple-darwin
             artifact: native32-emu-macos-x86_64
@@ -72,17 +69,6 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libasound2-dev libx11-dev libxkbcommon-dev
         timeout-minutes: 10
-
-      - name: Install cross-compilation tools
-        if: matrix.target == 'aarch64-unknown-linux-gnu'
-        run: |
-          sudo dpkg --add-architecture arm64
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu
-          sudo apt-get install -y libasound2-dev:arm64 libx11-dev:arm64 libxkbcommon-dev:arm64
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-          echo "PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig" >> $GITHUB_ENV
-          echo "PKG_CONFIG_ALLOW_CROSS=1" >> $GITHUB_ENV
 
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
