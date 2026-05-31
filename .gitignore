@@ -1,3 +1,5 @@
 doc/
 native32_game/
 third_party/
+.kiro/
+target/
