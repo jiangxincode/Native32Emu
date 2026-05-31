@@ -556,7 +556,7 @@ impl Native32Reader {
                 self.actions_cache.push(action);
             }
             // Check if the last one was None
-            if self.actions_cache.last().map_or(true, |a| a.is_none()) {
+            if self.actions_cache.last().is_none_or(|a| a.is_none()) {
                 break;
             }
         }

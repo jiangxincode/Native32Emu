@@ -150,7 +150,7 @@ impl AudioEngine {
 
     /// Check if music is still playing.
     pub fn is_playing(&self) -> bool {
-        self.sink.as_ref().map_or(false, |s| !s.empty())
+        self.sink.as_ref().is_some_and(|s| !s.empty())
     }
 
     /// Set the volume (0-100).

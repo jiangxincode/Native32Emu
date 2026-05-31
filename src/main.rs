@@ -1,5 +1,10 @@
 // Native32 Emulator - main entry point and emulation loop.
 
+#![allow(dead_code)]
+#![allow(clippy::upper_case_acronyms)]
+#![allow(clippy::manual_memcpy)]
+#![allow(clippy::needless_range_loop)]
+
 mod action_vm;
 mod actions;
 mod audio_engine;
@@ -174,7 +179,7 @@ impl Emulator {
                 if movie_frames.is_empty() {
                     continue;
                 }
-                if tick % 2 == 0 {
+                if tick.is_multiple_of(2) {
                     if movie.frame < movie_frames.len() - 1 {
                         advancements.push((name.clone(), movie.frame as isize + 1));
                     } else {

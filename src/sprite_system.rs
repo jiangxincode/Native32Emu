@@ -92,7 +92,7 @@ impl SpriteSystem {
                 continue;
             }
             // Half framerate: advance every other tick
-            if tick_count % 2 == 0 {
+            if tick_count.is_multiple_of(2) {
                 movie.next_frame = Some(movie.frame as isize + 1);
             }
         }

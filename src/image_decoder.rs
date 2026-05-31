@@ -253,7 +253,7 @@ fn argb1555_to_argb(value: u16) -> u32 {
         // Transparent
         0x00000000
     } else {
-        let r = ((value >> 0) & 0x1F) << 3;
+        let r = (value & 0x1F) << 3;
         let g = ((value >> 5) & 0x1F) << 3;
         let b = ((value >> 10) & 0x1F) << 3;
         0xFF000000 | ((r as u32) << 16) | ((g as u32) << 8) | (b as u32)

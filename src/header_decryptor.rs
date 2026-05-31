@@ -71,9 +71,8 @@ fn expand_key(src: &[u8]) -> Vec<u8> {
 fn do_sbox(data: &mut [u8], key: &[u8]) {
     for i in 0..8 {
         let k = &key[i * 6..(i + 1) * 6];
-        let idx = ((i * 4 + k[5] as usize + k[0] as usize * 2) * 0x10
-            + (k[4] as usize + k[1] as usize * 8 + k[2] as usize * 4 + k[3] as usize * 2))
-            as usize;
+        let idx = (i * 4 + k[5] as usize + k[0] as usize * 2) * 0x10
+            + (k[4] as usize + k[1] as usize * 8 + k[2] as usize * 4 + k[3] as usize * 2);
         let bits = expand_bits(&DES_SBOXES[idx..idx + 1], 4);
         for j in 0..4 {
             data[i * 4 + j] = bits[j];
@@ -102,7 +101,7 @@ fn decrypt_chunk(src: &[u8], expanded_key: &[u8]) -> Vec<u8> {
     let mut i: isize = 0x2d0;
     while i >= 0 {
         let idx = i as usize;
-        let mut temp_data = vec![0u8; 0x20];
+        let mut temp_data = [0u8; 0x20];
         temp_data.copy_from_slice(&expanded_data[..0x20]);
         process_iteration(&mut expanded_data, &expanded_key[idx..idx + 0x30]);
         for j in 0..0x20 {
