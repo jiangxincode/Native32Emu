@@ -13,7 +13,12 @@ fn read_u16_le_slice(data: &[u8], offset: usize) -> u16 {
 }
 
 fn read_u32_le_slice(data: &[u8], offset: usize) -> u32 {
-    u32::from_le_bytes([data[offset], data[offset + 1], data[offset + 2], data[offset + 3]])
+    u32::from_le_bytes([
+        data[offset],
+        data[offset + 1],
+        data[offset + 2],
+        data[offset + 3],
+    ])
 }
 
 fn clip(v: i32) -> u8 {
@@ -97,18 +102,19 @@ pub fn decode_image_yuv(data: &[u8]) -> Option<RgbaImage> {
     let mut v_1_1 = vec![0u8; uv_w * uv_h];
 
     // Helper to put a 2x2 quad of Y values + U/V
-    let putquad = |pix: usize, y_buf: &mut [u8], u_buf: &mut [u8], v_buf: &mut [u8], chunk: &[u8]| {
-        let y_coord = pix / uv_w;
-        let x_coord = pix % uv_w;
-        // Y values: x0y0, x0y1, x1y0, x1y1
-        y_buf[(2 * y_coord) * width + (2 * x_coord)] = chunk[0];
-        y_buf[(2 * y_coord + 1) * width + (2 * x_coord)] = chunk[1];
-        y_buf[(2 * y_coord) * width + (2 * x_coord + 1)] = chunk[2];
-        y_buf[(2 * y_coord + 1) * width + (2 * x_coord + 1)] = chunk[3];
-        // V is byte 4, U is byte 5
-        v_buf[pix] = chunk[4];
-        u_buf[pix] = chunk[5];
-    };
+    let putquad =
+        |pix: usize, y_buf: &mut [u8], u_buf: &mut [u8], v_buf: &mut [u8], chunk: &[u8]| {
+            let y_coord = pix / uv_w;
+            let x_coord = pix % uv_w;
+            // Y values: x0y0, x0y1, x1y0, x1y1
+            y_buf[(2 * y_coord) * width + (2 * x_coord)] = chunk[0];
+            y_buf[(2 * y_coord + 1) * width + (2 * x_coord)] = chunk[1];
+            y_buf[(2 * y_coord) * width + (2 * x_coord + 1)] = chunk[2];
+            y_buf[(2 * y_coord + 1) * width + (2 * x_coord + 1)] = chunk[3];
+            // V is byte 4, U is byte 5
+            v_buf[pix] = chunk[4];
+            u_buf[pix] = chunk[5];
+        };
 
     let mut pixel: usize = 0;
     let mut i: usize = 8;
@@ -138,7 +144,14 @@ pub fn decode_image_yuv(data: &[u8]) -> Option<RgbaImage> {
             if i + 6 > data.len() {
                 break;
             }
-            let chunk = [data[i], data[i + 1], data[i + 2], data[i + 3], data[i + 4], data[i + 5]];
+            let chunk = [
+                data[i],
+                data[i + 1],
+                data[i + 2],
+                data[i + 3],
+                data[i + 4],
+                data[i + 5],
+            ];
             i += 6;
             for _ in 0..op {
                 if pixel >= max_pixels {
@@ -222,11 +235,7 @@ pub fn decode_image_argb(data: &[u8]) -> Option<RgbaImage> {
             }
             i += 4;
         } else {
-            log::error!(
-                "Unknown ARGB command 0x{:04x} at offset 0x{:06x}",
-                op,
-                i
-            );
+            log::error!("Unknown ARGB command 0x{:04x} at offset 0x{:06x}", op, i);
             return None;
         }
     }

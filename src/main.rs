@@ -1,7 +1,7 @@
 // Native32 Emulator - main entry point and emulation loop.
 
-mod actions;
 mod action_vm;
+mod actions;
 mod audio_engine;
 mod cli;
 mod content_loader;
@@ -50,7 +50,6 @@ struct Emulator {
     scale: u32,
     _debug: bool,
 }
-
 
 impl Emulator {
     fn new(
@@ -127,12 +126,9 @@ impl Emulator {
             let self_ptr = self as *mut Emulator;
             unsafe {
                 for action_idx in frame_action_indices {
-                    (*self_ptr).vm.run(
-                        &mut (*self_ptr).reader,
-                        &mut *self_ptr,
-                        action_idx,
-                        "",
-                    );
+                    (*self_ptr)
+                        .vm
+                        .run(&mut (*self_ptr).reader, &mut *self_ptr, action_idx, "");
                 }
             }
 
@@ -157,12 +153,9 @@ impl Emulator {
             let self_ptr = self as *mut Emulator;
             unsafe {
                 for (name, action_idx) in movie_action_list {
-                    (*self_ptr).vm.run(
-                        &mut (*self_ptr).reader,
-                        &mut *self_ptr,
-                        action_idx,
-                        &name,
-                    );
+                    (*self_ptr)
+                        .vm
+                        .run(&mut (*self_ptr).reader, &mut *self_ptr, action_idx, &name);
                 }
             }
         }
@@ -257,7 +250,12 @@ impl Emulator {
             .cur_frame_objects
             .iter()
             .filter(|o| o.obj_type == ObjectType::Button)
-            .map(|o| (o.index as u32, self.reader.get_button_events(o.index as u32)))
+            .map(|o| {
+                (
+                    o.index as u32,
+                    self.reader.get_button_events(o.index as u32),
+                )
+            })
             .collect();
 
         for (_button_idx, events) in button_events {
@@ -439,12 +437,9 @@ impl VmHost for Emulator {
             let self_ptr = self as *mut Emulator;
             unsafe {
                 for action_idx in action_indices {
-                    (*self_ptr).vm.run(
-                        &mut (*self_ptr).reader,
-                        &mut *self_ptr,
-                        action_idx,
-                        "",
-                    );
+                    (*self_ptr)
+                        .vm
+                        .run(&mut (*self_ptr).reader, &mut *self_ptr, action_idx, "");
                 }
             }
         }
@@ -485,10 +480,14 @@ impl VmHost for Emulator {
                     match self.save_manager.load() {
                         Some(data) => {
                             self.vm.vars.insert(url.to_lowercase(), data);
-                            self.vm.vars.insert(success_var.to_lowercase(), "S".to_string());
+                            self.vm
+                                .vars
+                                .insert(success_var.to_lowercase(), "S".to_string());
                         }
                         None => {
-                            self.vm.vars.insert(success_var.to_lowercase(), "N".to_string());
+                            self.vm
+                                .vars
+                                .insert(success_var.to_lowercase(), "N".to_string());
                         }
                     }
                 }
@@ -498,7 +497,9 @@ impl VmHost for Emulator {
                 if parts.len() >= 3 {
                     let success_var = parts[2];
                     if self.save_manager.save(url) {
-                        self.vm.vars.insert(success_var.to_lowercase(), "S".to_string());
+                        self.vm
+                            .vars
+                            .insert(success_var.to_lowercase(), "S".to_string());
                     }
                 }
             }
@@ -531,12 +532,9 @@ impl VmHost for Emulator {
             let self_ptr = self as *mut Emulator;
             unsafe {
                 for action_idx in action_indices {
-                    (*self_ptr).vm.run(
-                        &mut (*self_ptr).reader,
-                        &mut *self_ptr,
-                        action_idx,
-                        "",
-                    );
+                    (*self_ptr)
+                        .vm
+                        .run(&mut (*self_ptr).reader, &mut *self_ptr, action_idx, "");
                 }
             }
         }
@@ -638,7 +636,11 @@ fn main() -> Result<()> {
 
         // Update window
         window
-            .update_with_buffer(&emu.renderer.buffer, display_width as usize, display_height as usize)
+            .update_with_buffer(
+                &emu.renderer.buffer,
+                display_width as usize,
+                display_height as usize,
+            )
             .context("Failed to update display")?;
 
         // Handle content switching
@@ -657,7 +659,8 @@ fn main() -> Result<()> {
         // Take screenshot if requested
         if let Some(ref path) = screenshot_path {
             if frame_count >= cli.screenshot_frames {
-                emu.renderer.save_screenshot(path)
+                emu.renderer
+                    .save_screenshot(path)
                     .context("Failed to save screenshot")?;
                 log::info!("Screenshot saved to: {}", path.display());
                 break;

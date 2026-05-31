@@ -51,7 +51,8 @@ impl SpriteSystem {
     /// - Add new named movies that appear in the frame
     /// - Remove non-cloned movies that are no longer in the frame
     pub fn update_for_frame(&mut self, frame_objects: &[crate::file_loader::FrameObject]) {
-        let mut frame_movie_names: std::collections::HashSet<String> = std::collections::HashSet::new();
+        let mut frame_movie_names: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
 
         for obj in frame_objects {
             if obj.obj_type == crate::file_loader::ObjectType::Movie {

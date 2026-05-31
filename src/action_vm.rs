@@ -135,7 +135,11 @@ impl ActionVM {
 
                 Action::GetVariable => {
                     let name = stack.pop().unwrap_or_default();
-                    let val = self.vars.get(&name.to_lowercase()).cloned().unwrap_or_default();
+                    let val = self
+                        .vars
+                        .get(&name.to_lowercase())
+                        .cloned()
+                        .unwrap_or_default();
                     stack.push(val);
                 }
 
@@ -175,28 +179,44 @@ impl ActionVM {
                 Action::Equals => {
                     let b = stack.pop().unwrap_or_default();
                     let a = stack.pop().unwrap_or_default();
-                    let result = if str_to_float(&a) == str_to_float(&b) { 1 } else { 0 };
+                    let result = if str_to_float(&a) == str_to_float(&b) {
+                        1
+                    } else {
+                        0
+                    };
                     stack.push(to_string(result));
                 }
 
                 Action::Less => {
                     let b = stack.pop().unwrap_or_default();
                     let a = stack.pop().unwrap_or_default();
-                    let result = if str_to_float(&a) < str_to_float(&b) { 1 } else { 0 };
+                    let result = if str_to_float(&a) < str_to_float(&b) {
+                        1
+                    } else {
+                        0
+                    };
                     stack.push(to_string(result));
                 }
 
                 Action::And => {
                     let b = stack.pop().unwrap_or_default();
                     let a = stack.pop().unwrap_or_default();
-                    let result = if str_to_int(&a) != 0 && str_to_int(&b) != 0 { 1 } else { 0 };
+                    let result = if str_to_int(&a) != 0 && str_to_int(&b) != 0 {
+                        1
+                    } else {
+                        0
+                    };
                     stack.push(to_string(result));
                 }
 
                 Action::Or => {
                     let b = stack.pop().unwrap_or_default();
                     let a = stack.pop().unwrap_or_default();
-                    let result = if str_to_int(&a) != 0 || str_to_int(&b) != 0 { 1 } else { 0 };
+                    let result = if str_to_int(&a) != 0 || str_to_int(&b) != 0 {
+                        1
+                    } else {
+                        0
+                    };
                     stack.push(to_string(result));
                 }
 

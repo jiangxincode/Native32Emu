@@ -44,7 +44,13 @@ fn slice_and_dice(src: &mut [u8], count: usize, splitpoint: usize, offset: usize
 fn expand_key(src: &[u8]) -> Vec<u8> {
     let key_bits_raw = expand_bits(src, 0x40);
     let mut key_bits = key_bits_raw;
-    do_shuffle(&mut key_bits.clone(), &key_bits, &INITIAL_KEY_PERMUTATION, 0x38, 0);
+    do_shuffle(
+        &mut key_bits.clone(),
+        &key_bits,
+        &INITIAL_KEY_PERMUTATION,
+        0x38,
+        0,
+    );
     // Re-do with proper in-place
     let mut kb = vec![0u8; 0x38];
     for i in 0..0x38 {
@@ -136,7 +142,10 @@ pub fn decrypt_header(data: &[u8]) -> Option<Vec<u8>> {
     for key in keys {
         let decrypted = do_decrypt(data, key);
         if decrypted.len() >= 8 && &decrypted[4..8] == b"8202" {
-            log::info!("Using DES key: {:?}", std::str::from_utf8(key).unwrap_or("?"));
+            log::info!(
+                "Using DES key: {:?}",
+                std::str::from_utf8(key).unwrap_or("?")
+            );
             return Some(decrypted);
         }
     }

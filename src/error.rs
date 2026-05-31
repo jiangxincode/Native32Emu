@@ -20,7 +20,10 @@ pub enum EmuError {
     UnknownOpcode { opcode: u32, pc: usize },
 
     #[error("Resource offset 0x{offset:08x} exceeds file size for {resource_type}")]
-    OffsetOutOfBounds { offset: usize, resource_type: String },
+    OffsetOutOfBounds {
+        offset: usize,
+        resource_type: String,
+    },
 
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),

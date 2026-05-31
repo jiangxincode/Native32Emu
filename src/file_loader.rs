@@ -214,11 +214,12 @@ impl Native32Reader {
         // Decrypt the 32-byte encrypted header at base + 0x18
         let enc_start = self.base + 0x18;
         if enc_start + 0x20 > self.data.len() {
-            return Err(EmuError::InvalidFile("Encrypted header extends beyond file".into()));
+            return Err(EmuError::InvalidFile(
+                "Encrypted header extends beyond file".into(),
+            ));
         }
         let encrypted = &self.data[enc_start..enc_start + 0x20];
-        let decrypted = decrypt_header(encrypted)
-            .ok_or(EmuError::DecryptionFailed)?;
+        let decrypted = decrypt_header(encrypted).ok_or(EmuError::DecryptionFailed)?;
 
         // Parse resource table offsets from decrypted header
         // Layout: unkh(4) + magic(4) + frame(4) + image(4) + action(4) + movie(4) + button(4) + button_cond(4)
@@ -258,7 +259,10 @@ impl Native32Reader {
     }
 
     /// Disassemble a single action instruction at the given 1-based index.
-    fn disassemble_action(&self, index: u32) -> Option<(crate::actions::Action, Option<ActionPayload>)> {
+    fn disassemble_action(
+        &self,
+        index: u32,
+    ) -> Option<(crate::actions::Action, Option<ActionPayload>)> {
         let ptr = self.base + self.action_idx as usize + ((index - 1) * 8) as usize;
         if ptr + 8 > self.data.len() {
             return None;
@@ -297,7 +301,10 @@ impl Native32Reader {
     }
 
     /// Get an action by 1-based index (with lazy caching).
-    pub fn get_action(&mut self, index: u32) -> Option<(crate::actions::Action, Option<ActionPayload>)> {
+    pub fn get_action(
+        &mut self,
+        index: u32,
+    ) -> Option<(crate::actions::Action, Option<ActionPayload>)> {
         while index as usize >= self.actions_cache.len() {
             let i = self.actions_cache.len() as u32;
             let action = self.disassemble_action(i);
@@ -307,7 +314,10 @@ impl Native32Reader {
     }
 
     /// Get an action by 1-based index (immutable, assumes already cached).
-    pub fn get_action_cached(&self, index: u32) -> Option<&(crate::actions::Action, Option<ActionPayload>)> {
+    pub fn get_action_cached(
+        &self,
+        index: u32,
+    ) -> Option<&(crate::actions::Action, Option<ActionPayload>)> {
         if (index as usize) < self.actions_cache.len() {
             self.actions_cache[index as usize].as_ref()
         } else {
