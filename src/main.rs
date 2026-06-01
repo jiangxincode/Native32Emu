@@ -296,8 +296,11 @@ impl Emulator {
         if !self.show_gamepad {
             return;
         }
-        let pressed: std::collections::HashSet<u16> =
-            self.input.get_pressed_keycodes(window).into_iter().collect();
+        let pressed: std::collections::HashSet<u16> = self
+            .input
+            .get_pressed_keycodes(window)
+            .into_iter()
+            .collect();
         let resolution = self.reader.resolution;
         let w = resolution.0 * self.scale;
         let h = resolution.1 * self.scale;

@@ -105,37 +105,142 @@ impl GamepadOverlay {
 
         // Background pad for D-pad area (11u x 11u)
         Self::fill_rect_alpha(
-            buffer, width, height,
-            dpad_cx - 5 * u, dpad_cy - 5 * u,
-            11 * u, 11 * u,
+            buffer,
+            width,
+            height,
+            dpad_cx - 5 * u,
+            dpad_cy - 5 * u,
+            11 * u,
+            11 * u,
             COLOR_BG,
         );
 
         // Center square
-        Self::fill_rect(buffer, width, height, dpad_cx - u, dpad_cy - u, 3 * u, 3 * u, COLOR_IDLE);
+        Self::fill_rect(
+            buffer,
+            width,
+            height,
+            dpad_cx - u,
+            dpad_cy - u,
+            3 * u,
+            3 * u,
+            COLOR_IDLE,
+        );
 
         // Up arm
-        let up_color = if pressed.contains(&KEY_UP) { COLOR_DPAD_PRESSED } else { COLOR_IDLE };
-        Self::fill_rect(buffer, width, height, dpad_cx - u, dpad_cy - 5 * u, 3 * u, 4 * u, up_color);
+        let up_color = if pressed.contains(&KEY_UP) {
+            COLOR_DPAD_PRESSED
+        } else {
+            COLOR_IDLE
+        };
+        Self::fill_rect(
+            buffer,
+            width,
+            height,
+            dpad_cx - u,
+            dpad_cy - 5 * u,
+            3 * u,
+            4 * u,
+            up_color,
+        );
 
         // Down arm
-        let down_color = if pressed.contains(&KEY_DOWN) { COLOR_DPAD_PRESSED } else { COLOR_IDLE };
-        Self::fill_rect(buffer, width, height, dpad_cx - u, dpad_cy + 2 * u, 3 * u, 4 * u, down_color);
+        let down_color = if pressed.contains(&KEY_DOWN) {
+            COLOR_DPAD_PRESSED
+        } else {
+            COLOR_IDLE
+        };
+        Self::fill_rect(
+            buffer,
+            width,
+            height,
+            dpad_cx - u,
+            dpad_cy + 2 * u,
+            3 * u,
+            4 * u,
+            down_color,
+        );
 
         // Left arm
-        let left_color = if pressed.contains(&KEY_LEFT) { COLOR_DPAD_PRESSED } else { COLOR_IDLE };
-        Self::fill_rect(buffer, width, height, dpad_cx - 5 * u, dpad_cy - u, 4 * u, 3 * u, left_color);
+        let left_color = if pressed.contains(&KEY_LEFT) {
+            COLOR_DPAD_PRESSED
+        } else {
+            COLOR_IDLE
+        };
+        Self::fill_rect(
+            buffer,
+            width,
+            height,
+            dpad_cx - 5 * u,
+            dpad_cy - u,
+            4 * u,
+            3 * u,
+            left_color,
+        );
 
         // Right arm
-        let right_color = if pressed.contains(&KEY_RIGHT) { COLOR_DPAD_PRESSED } else { COLOR_IDLE };
-        Self::fill_rect(buffer, width, height, dpad_cx + 2 * u, dpad_cy - u, 4 * u, 3 * u, right_color);
+        let right_color = if pressed.contains(&KEY_RIGHT) {
+            COLOR_DPAD_PRESSED
+        } else {
+            COLOR_IDLE
+        };
+        Self::fill_rect(
+            buffer,
+            width,
+            height,
+            dpad_cx + 2 * u,
+            dpad_cy - u,
+            4 * u,
+            3 * u,
+            right_color,
+        );
 
         // Draw arrow glyphs on each arm
         let glyph_scale = if scale >= 3 { 2 } else { 1 };
-        Self::draw_glyph(buffer, width, height, &ARROW_UP, dpad_cx - u, dpad_cy - 4 * u, 3 * u, glyph_scale, COLOR_LABEL);
-        Self::draw_glyph(buffer, width, height, &ARROW_DOWN, dpad_cx - u, dpad_cy + 2 * u, 3 * u, glyph_scale, COLOR_LABEL);
-        Self::draw_glyph(buffer, width, height, &ARROW_LEFT, dpad_cx - 4 * u, dpad_cy - u, 3 * u, glyph_scale, COLOR_LABEL);
-        Self::draw_glyph(buffer, width, height, &ARROW_RIGHT, dpad_cx + 2 * u, dpad_cy - u, 3 * u, glyph_scale, COLOR_LABEL);
+        Self::draw_glyph(
+            buffer,
+            width,
+            height,
+            &ARROW_UP,
+            dpad_cx - u,
+            dpad_cy - 4 * u,
+            3 * u,
+            glyph_scale,
+            COLOR_LABEL,
+        );
+        Self::draw_glyph(
+            buffer,
+            width,
+            height,
+            &ARROW_DOWN,
+            dpad_cx - u,
+            dpad_cy + 2 * u,
+            3 * u,
+            glyph_scale,
+            COLOR_LABEL,
+        );
+        Self::draw_glyph(
+            buffer,
+            width,
+            height,
+            &ARROW_LEFT,
+            dpad_cx - 4 * u,
+            dpad_cy - u,
+            3 * u,
+            glyph_scale,
+            COLOR_LABEL,
+        );
+        Self::draw_glyph(
+            buffer,
+            width,
+            height,
+            &ARROW_RIGHT,
+            dpad_cx + 2 * u,
+            dpad_cy - u,
+            3 * u,
+            glyph_scale,
+            COLOR_LABEL,
+        );
 
         // --- A/B buttons (bottom-right) ---
         let btn_radius = 2 * u;
@@ -146,38 +251,87 @@ impl GamepadOverlay {
 
         // Background pad for button area
         Self::fill_rect_alpha(
-            buffer, width, height,
-            btn_b_cx - 3 * u, btn_a_cy - 3 * u,
-            12 * u, 8 * u,
+            buffer,
+            width,
+            height,
+            btn_b_cx - 3 * u,
+            btn_a_cy - 3 * u,
+            12 * u,
+            8 * u,
             COLOR_BG,
         );
 
         // A button
-        let a_color = if pressed.contains(&KEY_A) { COLOR_A_PRESSED } else { COLOR_IDLE };
-        Self::fill_circle(buffer, width, height, btn_a_cx, btn_a_cy, btn_radius, a_color);
+        let a_color = if pressed.contains(&KEY_A) {
+            COLOR_A_PRESSED
+        } else {
+            COLOR_IDLE
+        };
+        Self::fill_circle(
+            buffer, width, height, btn_a_cx, btn_a_cy, btn_radius, a_color,
+        );
 
         // B button
-        let b_color = if pressed.contains(&KEY_B) { COLOR_B_PRESSED } else { COLOR_IDLE };
-        Self::fill_circle(buffer, width, height, btn_b_cx, btn_b_cy, btn_radius, b_color);
+        let b_color = if pressed.contains(&KEY_B) {
+            COLOR_B_PRESSED
+        } else {
+            COLOR_IDLE
+        };
+        Self::fill_circle(
+            buffer, width, height, btn_b_cx, btn_b_cy, btn_radius, b_color,
+        );
 
         // Draw letter glyphs on buttons
-        Self::draw_glyph(buffer, width, height, &FONT_A, btn_a_cx - u, btn_a_cy - u, 3 * u, glyph_scale, COLOR_LABEL);
-        Self::draw_glyph(buffer, width, height, &FONT_B, btn_b_cx - u, btn_b_cy - u, 3 * u, glyph_scale, COLOR_LABEL);
+        Self::draw_glyph(
+            buffer,
+            width,
+            height,
+            &FONT_A,
+            btn_a_cx - u,
+            btn_a_cy - u,
+            3 * u,
+            glyph_scale,
+            COLOR_LABEL,
+        );
+        Self::draw_glyph(
+            buffer,
+            width,
+            height,
+            &FONT_B,
+            btn_b_cx - u,
+            btn_b_cy - u,
+            3 * u,
+            glyph_scale,
+            COLOR_LABEL,
+        );
     }
 
     /// Fill a rectangle with a solid color.
     fn fill_rect(buffer: &mut [u32], bw: u32, bh: u32, x: i32, y: i32, w: i32, h: i32, color: u32) {
         for py in y..y + h {
-            if py < 0 || py >= bh as i32 { continue; }
+            if py < 0 || py >= bh as i32 {
+                continue;
+            }
             for px in x..x + w {
-                if px < 0 || px >= bw as i32 { continue; }
+                if px < 0 || px >= bw as i32 {
+                    continue;
+                }
                 buffer[(py as u32 * bw + px as u32) as usize] = color;
             }
         }
     }
 
     /// Fill a rectangle with alpha blending (semi-transparent).
-    fn fill_rect_alpha(buffer: &mut [u32], bw: u32, bh: u32, x: i32, y: i32, w: i32, h: i32, color: u32) {
+    fn fill_rect_alpha(
+        buffer: &mut [u32],
+        bw: u32,
+        bh: u32,
+        x: i32,
+        y: i32,
+        w: i32,
+        h: i32,
+        color: u32,
+    ) {
         let a = ((color >> 24) & 0xFF) as u32;
         let inv_a = 255 - a;
         let sr = ((color >> 16) & 0xFF) as u32;
@@ -185,9 +339,13 @@ impl GamepadOverlay {
         let sb = (color & 0xFF) as u32;
 
         for py in y..y + h {
-            if py < 0 || py >= bh as i32 { continue; }
+            if py < 0 || py >= bh as i32 {
+                continue;
+            }
             for px in x..x + w {
-                if px < 0 || px >= bw as i32 { continue; }
+                if px < 0 || px >= bw as i32 {
+                    continue;
+                }
                 let idx = (py as u32 * bw + px as u32) as usize;
                 let dst = buffer[idx];
                 let dr = ((dst >> 16) & 0xFF) as u32;
@@ -206,10 +364,14 @@ impl GamepadOverlay {
         let r2 = r * r;
         for dy in -r..=r {
             let py = cy + dy;
-            if py < 0 || py >= bh as i32 { continue; }
+            if py < 0 || py >= bh as i32 {
+                continue;
+            }
             for dx in -r..=r {
                 let px = cx + dx;
-                if px < 0 || px >= bw as i32 { continue; }
+                if px < 0 || px >= bw as i32 {
+                    continue;
+                }
                 if dx * dx + dy * dy <= r2 {
                     buffer[(py as u32 * bw + px as u32) as usize] = color;
                 }
@@ -242,10 +404,14 @@ impl GamepadOverlay {
                     // Draw a pixel_scale x pixel_scale block
                     for sy in 0..pixel_scale {
                         let py = oy + row * pixel_scale + sy;
-                        if py < 0 || py >= bh as i32 { continue; }
+                        if py < 0 || py >= bh as i32 {
+                            continue;
+                        }
                         for sx in 0..pixel_scale {
                             let px = ox + col * pixel_scale + sx;
-                            if px < 0 || px >= bw as i32 { continue; }
+                            if px < 0 || px >= bw as i32 {
+                                continue;
+                            }
                             buffer[(py as u32 * bw + px as u32) as usize] = color;
                         }
                     }
