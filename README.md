@@ -4,7 +4,7 @@
 [![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=jiangxincode_Native32Emu&metric=alert_status)](https://sonarcloud.io/dashboard?id=jiangxincode_Native32Emu)
 [![License: BSD 3-Clause](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](LICENSE)
 
-A Native32 game emulator written in Rust, based on the [n32emu](https://github.com/gatecat/n32emu) Python reference implementation.
+A Native32 game emulator written in Rust.
 
 Native32 is a game format developed by Sunplus for DVD player and TV chipsets (circa 2005–2011). Games use `.smf`, `.sgm`, or `.ssl` file extensions and feature a stack-based, ActionScript-like virtual machine with raster graphics.
 
@@ -252,9 +252,9 @@ All 84 Native32 games in the test suite load and run without fatal errors. Each 
 
 ## Acknowledgments
 
-- [n32emu](https://github.com/gatecat/n32emu) by Myrtle Shah — the Python reference implementation this emulator is based on
+- [n32emu](https://github.com/gatecat/n32emu) by Myrtle Shah — the Python reference implementation
 - [BootlegGames Wiki](https://bootleggames.fandom.com/wiki/Native_32) — hardware documentation and game catalog
 
 ## License
 
-This project is licensed under the [BSD 3-Clause License](third_party/n32emu/COPYING), consistent with the reference implementation.
+This project is licensed under the [BSD 3-Clause License](LICENSE).
