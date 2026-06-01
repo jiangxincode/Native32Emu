@@ -1,11 +1,14 @@
 // Audio engine: handles MP3 and raw PCM audio playback.
 
+use std::num::NonZero;
+
 use crate::file_loader::{AudioFormat, Colorspace, Native32Reader};
 
 pub struct AudioEngine {
-    _stream: Option<rodio::OutputStream>,
-    handle: Option<rodio::OutputStreamHandle>,
-    sink: Option<rodio::Sink>,
+    // MixerDeviceSink must be kept alive; dropping it stops playback
+    _mixer_device: Option<rodio::MixerDeviceSink>,
+    mixer: Option<rodio::mixer::Mixer>,
+    player: Option<rodio::Player>,
     pub volume: f32,
     pub colorspace: Colorspace,
     // Track which movie owns the music channel
@@ -14,8 +17,11 @@ pub struct AudioEngine {
 
 impl AudioEngine {
     pub fn new(colorspace: Colorspace, volume: u32) -> Self {
-        let (stream, handle) = match rodio::OutputStream::try_default() {
-            Ok((s, h)) => (Some(s), Some(h)),
+        let (mixer_device, mixer) = match rodio::DeviceSinkBuilder::open_default_sink() {
+            Ok(mds) => {
+                let mixer = mds.mixer().clone();
+                (Some(mds), Some(mixer))
+            }
             Err(e) => {
                 log::warn!("Failed to initialize audio: {}", e);
                 (None, None)
@@ -23,9 +29,9 @@ impl AudioEngine {
         };
 
         Self {
-            _stream: stream,
-            handle,
-            sink: None,
+            _mixer_device: mixer_device,
+            mixer,
+            player: None,
             volume: volume as f32 / 100.0,
             colorspace,
             music_owner: None,
@@ -61,39 +67,31 @@ impl AudioEngine {
     }
 
     fn play_mp3(&mut self, data: &[u8], repeat: i32, movie_name: &str) -> bool {
-        if let Some(ref handle) = self.handle {
+        if let Some(ref mixer) = self.mixer {
             // Stop current music
-            if let Some(ref sink) = self.sink {
-                sink.stop();
+            if let Some(ref player) = self.player {
+                player.stop();
             }
 
-            match rodio::Sink::try_new(handle) {
-                Ok(sink) => {
-                    sink.set_volume(self.volume);
-                    let loops = if repeat == 0xFF { i32::MAX } else { repeat };
+            let player = rodio::Player::connect_new(mixer);
+            player.set_volume(self.volume);
+            let _loops = if repeat == 0xFF { i32::MAX } else { repeat };
 
-                    // Create a cursor from the data
-                    let cursor = std::io::Cursor::new(data.to_vec());
-                    match rodio::Decoder::new_mp3(cursor) {
-                        Ok(decoder) => {
-                            if loops > 0 {
-                                // For repeated playback, use the sink's built-in looping
-                                // rodio doesn't have native loop count, so we just play once
-                                // and let the emulator re-trigger if needed
-                                sink.append(decoder);
-                            }
-                            self.sink = Some(sink);
-                            self.music_owner = Some(movie_name.to_string());
-                            true
-                        }
-                        Err(e) => {
-                            log::warn!("Failed to decode MP3: {}", e);
-                            false
-                        }
+            // Create a cursor from the data
+            let cursor = std::io::Cursor::new(data.to_vec());
+            match rodio::Decoder::new_mp3(cursor) {
+                Ok(decoder) => {
+                    if _loops > 0 {
+                        // For repeated playback, we just play once
+                        // and let the emulator re-trigger if needed
+                        player.append(decoder);
                     }
+                    self.player = Some(player);
+                    self.music_owner = Some(movie_name.to_string());
+                    true
                 }
                 Err(e) => {
-                    log::warn!("Failed to create audio sink: {}", e);
+                    log::warn!("Failed to decode MP3: {}", e);
                     false
                 }
             }
@@ -103,7 +101,7 @@ impl AudioEngine {
     }
 
     fn play_raw(&mut self, data: &[u8], _repeat: i32, movie_name: &str) -> bool {
-        if let Some(ref handle) = self.handle {
+        if let Some(ref mixer) = self.mixer {
             // Determine sample rate based on colorspace
             let sample_rate = match self.colorspace {
                 Colorspace::YUV => 11025u32,
@@ -119,21 +117,18 @@ impl AudioEngine {
                 })
                 .collect();
 
-            let source = rodio::buffer::SamplesBuffer::new(1, sample_rate, samples);
+            let source = rodio::buffer::SamplesBuffer::new(
+                NonZero::<u16>::new(1).unwrap(),
+                NonZero::<u32>::new(sample_rate).unwrap(),
+                samples,
+            );
 
-            match rodio::Sink::try_new(handle) {
-                Ok(sink) => {
-                    sink.set_volume(self.volume);
-                    sink.append(source);
-                    self.sink = Some(sink);
-                    self.music_owner = Some(movie_name.to_string());
-                    true
-                }
-                Err(e) => {
-                    log::warn!("Failed to create audio sink: {}", e);
-                    false
-                }
-            }
+            let player = rodio::Player::connect_new(mixer);
+            player.set_volume(self.volume);
+            player.append(source);
+            self.player = Some(player);
+            self.music_owner = Some(movie_name.to_string());
+            true
         } else {
             false
         }
@@ -141,23 +136,23 @@ impl AudioEngine {
 
     /// Stop all currently playing sounds.
     pub fn stop_all(&mut self) {
-        if let Some(ref sink) = self.sink {
-            sink.stop();
+        if let Some(ref player) = self.player {
+            player.stop();
         }
-        self.sink = None;
+        self.player = None;
         self.music_owner = None;
     }
 
     /// Check if music is still playing.
     pub fn is_playing(&self) -> bool {
-        self.sink.as_ref().is_some_and(|s| !s.empty())
+        self.player.as_ref().is_some_and(|p| !p.empty())
     }
 
     /// Set the volume (0-100).
     pub fn set_volume(&mut self, volume: u32) {
         self.volume = volume as f32 / 100.0;
-        if let Some(ref sink) = self.sink {
-            sink.set_volume(self.volume);
+        if let Some(ref player) = self.player {
+            player.set_volume(self.volume);
         }
     }
 }
