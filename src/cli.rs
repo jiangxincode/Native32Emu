@@ -38,6 +38,10 @@ pub struct Cli {
     /// Number of frames to run before taking screenshot (default: 30)
     #[arg(long = "screenshot-frames", default_value = "30")]
     pub screenshot_frames: u32,
+
+    /// Show an on-screen virtual gamepad overlay
+    #[arg(long)]
+    pub show_gamepad: bool,
 }
 
 impl Cli {

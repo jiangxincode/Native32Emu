@@ -14,6 +14,7 @@ mod des_constants;
 mod error;
 mod file_loader;
 mod frame_player;
+mod gamepad_overlay;
 mod header_decryptor;
 mod image_decoder;
 mod input_handler;
@@ -33,6 +34,7 @@ use crate::audio_engine::AudioEngine;
 use crate::cli::Cli;
 use crate::content_loader::ContentLoader;
 use crate::frame_player::FramePlayer;
+use crate::gamepad_overlay::GamepadOverlay;
 use crate::input_handler::InputHandler;
 use crate::renderer::Renderer;
 use crate::save_manager::SaveManager;
@@ -53,6 +55,7 @@ struct Emulator {
     tick_count: u64,
     time_ms: u32,
     scale: u32,
+    show_gamepad: bool,
     _debug: bool,
 }
 
@@ -63,6 +66,7 @@ impl Emulator {
         scale: u32,
         volume: u32,
         debug: bool,
+        show_gamepad: bool,
         key_remappings: &[(u16, minifb::Key)],
     ) -> Result<Self> {
         let mut reader = Native32Reader::new(data);
@@ -94,6 +98,7 @@ impl Emulator {
             tick_count: 0,
             time_ms: 0,
             scale,
+            show_gamepad,
             _debug: debug,
         })
     }
@@ -284,6 +289,19 @@ impl Emulator {
     fn draw(&mut self) {
         self.renderer
             .draw_frame(&mut self.reader, &self.sprites, &self.cur_frame_objects);
+    }
+
+    /// Draw the virtual gamepad overlay if enabled.
+    fn draw_gamepad_overlay(&mut self, window: &minifb::Window) {
+        if !self.show_gamepad {
+            return;
+        }
+        let pressed: std::collections::HashSet<u16> =
+            self.input.get_pressed_keycodes(window).into_iter().collect();
+        let resolution = self.reader.resolution;
+        let w = resolution.0 * self.scale;
+        let h = resolution.1 * self.scale;
+        GamepadOverlay::draw(&mut self.renderer.buffer, w, h, self.scale, &pressed);
     }
 
     /// Switch to new content (SSL multi-file).
@@ -596,6 +614,7 @@ fn main() -> Result<()> {
         cli.scale,
         cli.volume,
         cli.debug,
+        cli.show_gamepad,
         &key_remappings,
     )?;
 
@@ -638,6 +657,9 @@ fn main() -> Result<()> {
 
         // Draw frame
         emu.draw();
+
+        // Draw gamepad overlay if enabled
+        emu.draw_gamepad_overlay(&window);
 
         // Update window
         window
