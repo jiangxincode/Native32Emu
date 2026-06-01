@@ -404,7 +404,7 @@ impl ActionVM {
                     let upper = stack.pop().unwrap_or_default();
                     let upper_val = str_to_int(&upper) as u32;
                     let result = if upper_val > 0 {
-                        self.rng.gen_range(0..upper_val)
+                        self.rng.random_range(0..upper_val)
                     } else {
                         0
                     };
