@@ -307,6 +307,7 @@ impl GamepadOverlay {
     }
 
     /// Fill a rectangle with a solid color.
+    #[allow(clippy::too_many_arguments)]
     fn fill_rect(buffer: &mut [u32], bw: u32, bh: u32, x: i32, y: i32, w: i32, h: i32, color: u32) {
         for py in y..y + h {
             if py < 0 || py >= bh as i32 {
@@ -322,6 +323,7 @@ impl GamepadOverlay {
     }
 
     /// Fill a rectangle with alpha blending (semi-transparent).
+    #[allow(clippy::too_many_arguments)]
     fn fill_rect_alpha(
         buffer: &mut [u32],
         bw: u32,
@@ -332,11 +334,11 @@ impl GamepadOverlay {
         h: i32,
         color: u32,
     ) {
-        let a = ((color >> 24) & 0xFF) as u32;
+        let a = (color >> 24) & 0xFF;
         let inv_a = 255 - a;
-        let sr = ((color >> 16) & 0xFF) as u32;
-        let sg = ((color >> 8) & 0xFF) as u32;
-        let sb = (color & 0xFF) as u32;
+        let sr = (color >> 16) & 0xFF;
+        let sg = (color >> 8) & 0xFF;
+        let sb = color & 0xFF;
 
         for py in y..y + h {
             if py < 0 || py >= bh as i32 {
@@ -348,9 +350,9 @@ impl GamepadOverlay {
                 }
                 let idx = (py as u32 * bw + px as u32) as usize;
                 let dst = buffer[idx];
-                let dr = ((dst >> 16) & 0xFF) as u32;
-                let dg = ((dst >> 8) & 0xFF) as u32;
-                let db = (dst & 0xFF) as u32;
+                let dr = (dst >> 16) & 0xFF;
+                let dg = (dst >> 8) & 0xFF;
+                let db = dst & 0xFF;
                 let r = (sr * a + dr * inv_a) / 255;
                 let g = (sg * a + dg * inv_a) / 255;
                 let b = (sb * a + db * inv_a) / 255;
@@ -381,6 +383,7 @@ impl GamepadOverlay {
 
     /// Draw a 5x7 bitmap glyph scaled to fit within a cell of `cell_size` pixels.
     /// The glyph is centered within the cell.
+    #[allow(clippy::too_many_arguments)]
     fn draw_glyph(
         buffer: &mut [u32],
         bw: u32,
