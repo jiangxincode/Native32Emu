@@ -1153,7 +1153,7 @@ dependencies = [
  "image",
  "log",
  "minifb",
- "rand 0.9.4",
+ "rand 0.10.1",
  "rodio",
  "thiserror 2.0.18",
 ]
