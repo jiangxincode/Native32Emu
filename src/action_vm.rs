@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use rand::Rng;
+use rand::RngExt;
 
 use crate::actions::Action;
 use crate::file_loader::{ActionPayload, Native32Reader};
