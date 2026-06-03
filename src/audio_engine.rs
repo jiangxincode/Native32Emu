@@ -3,6 +3,7 @@
 use std::num::NonZero;
 
 use crate::file_loader::{AudioFormat, Colorspace, Native32Reader};
+use rodio::Source;
 
 pub struct AudioEngine {
     // MixerDeviceSink must be kept alive; dropping it stops playback
@@ -11,7 +12,7 @@ pub struct AudioEngine {
     player: Option<rodio::Player>,
     pub volume: f32,
     pub colorspace: Colorspace,
-    // Track which movie owns the music channel
+    // Track which movie owns the currently playing sound
     pub music_owner: Option<String>,
 }
 
@@ -75,16 +76,23 @@ impl AudioEngine {
 
             let player = rodio::Player::connect_new(mixer);
             player.set_volume(self.volume);
-            let _loops = if repeat == 0xFF { i32::MAX } else { repeat };
 
             // Create a cursor from the data
             let cursor = std::io::Cursor::new(data.to_vec());
             match rodio::Decoder::new_mp3(cursor) {
                 Ok(decoder) => {
-                    if _loops > 0 {
-                        // For repeated playback, we just play once
-                        // and let the emulator re-trigger if needed
-                        player.append(decoder);
+                    let buffered = decoder.buffered();
+                    if repeat == 0xFF {
+                        // Infinite loop
+                        player.append(buffered.repeat_infinite());
+                    } else if repeat > 1 {
+                        // Finite repeat: append the buffered source N times
+                        for _ in 0..repeat {
+                            player.append(buffered.clone());
+                        }
+                    } else {
+                        // Play once (repeat == 0 or 1)
+                        player.append(buffered);
                     }
                     self.player = Some(player);
                     self.music_owner = Some(movie_name.to_string());
@@ -100,7 +108,7 @@ impl AudioEngine {
         }
     }
 
-    fn play_raw(&mut self, data: &[u8], _repeat: i32, movie_name: &str) -> bool {
+    fn play_raw(&mut self, data: &[u8], repeat: i32, movie_name: &str) -> bool {
         if let Some(ref mixer) = self.mixer {
             // Determine sample rate based on colorspace
             let sample_rate = match self.colorspace {
@@ -125,7 +133,18 @@ impl AudioEngine {
 
             let player = rodio::Player::connect_new(mixer);
             player.set_volume(self.volume);
-            player.append(source);
+
+            if repeat == 0xFF {
+                player.append(source.repeat_infinite());
+            } else if repeat > 1 {
+                let buffered = source.buffered();
+                for _ in 0..repeat {
+                    player.append(buffered.clone());
+                }
+            } else {
+                player.append(source);
+            }
+
             self.player = Some(player);
             self.music_owner = Some(movie_name.to_string());
             true
@@ -141,6 +160,17 @@ impl AudioEngine {
         }
         self.player = None;
         self.music_owner = None;
+    }
+
+    /// Stop sound only if the given movie is the current owner.
+    pub fn stop_for_movie(&mut self, movie_name: &str) {
+        if self.music_owner.as_deref() == Some(movie_name) {
+            if let Some(ref player) = self.player {
+                player.stop();
+            }
+            self.player = None;
+            self.music_owner = None;
+        }
     }
 
     /// Check if music is still playing.

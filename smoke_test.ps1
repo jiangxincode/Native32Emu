@@ -43,7 +43,7 @@ if (-not (Test-Path $binary)) {
 
 # Find all Native32 game files (.smf and .ssl, exclude NESGAME)
 $smfGames = Get-ChildItem -Path $gameRoot -Filter "*.smf" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "NESGAME" }
-$sslGames = Get-ChildItem -Path $gameRoot -Filter "*.ssl" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "NESGAME" }
+$sslGames = Get-ChildItem -Path $gameRoot -Filter "*.ssl" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch "NESGAME" -and $_.FullName -notmatch "\.ssl_sav$" }
 $games = @($smfGames) + @($sslGames)
 $games = $games | Sort-Object FullName
 

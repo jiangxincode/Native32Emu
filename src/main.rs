@@ -203,39 +203,58 @@ impl Emulator {
         }
 
         // Process pending movie frame switches
+        // Collect names first to avoid borrow conflicts
         let names: Vec<String> = self.sprites.sprites.keys().cloned().collect();
-        for name in names {
-            let next = self.sprites.get(&name).and_then(|m| m.next_frame);
+        for name in &names {
+            let next = self.sprites.get(name).and_then(|m| m.next_frame);
             if let Some(next_frame) = next {
-                if let Some(movie) = self.sprites.get_mut(&name) {
+                if let Some(movie) = self.sprites.get_mut(name) {
                     if next_frame == -1 {
                         movie.frame = 0;
                     } else if (next_frame as usize) < self.reader.get_movie(movie.movie).len() {
                         movie.frame = next_frame as usize;
                     }
                     movie.next_frame = None;
+                }
 
+                // Collect sound/action data to avoid borrow conflicts
+                // (self.audio.play_sound needs &mut self.reader and &mut self.audio,
+                //  while we also need &mut self.sprites for sound_channel)
+                let frame_data = {
+                    let movie = match self.sprites.get(name) {
+                        Some(m) => m,
+                        None => continue,
+                    };
                     let movie_frames = self.reader.get_movie(movie.movie);
                     if movie.frame < movie_frames.len() {
                         let mf = movie_frames[movie.frame];
+                        Some((mf.sound, mf.action))
+                    } else {
+                        None
+                    }
+                };
 
-                        // Play sound if present
-                        if mf.sound != 0 {
-                            self.audio.play_sound(&mut self.reader, mf.sound, &name);
+                if let Some((sound, action)) = frame_data {
+                    // Play sound if present and track it on the movie
+                    if sound != 0
+                        && self.audio.play_sound(&mut self.reader, sound, name)
+                    {
+                        if let Some(movie) = self.sprites.get_mut(name) {
+                            movie.sound_channel = Some(0);
                         }
+                    }
 
-                        // Execute movie frame action
-                        if mf.action != 0 {
-                            let action_idx = mf.action as u32;
-                            let self_ptr = self as *mut Emulator;
-                            unsafe {
-                                (*self_ptr).vm.run(
-                                    &mut (*self_ptr).reader,
-                                    &mut *self_ptr,
-                                    action_idx,
-                                    &name,
-                                );
-                            }
+                    // Execute movie frame action
+                    if action != 0 {
+                        let action_idx = action as u32;
+                        let self_ptr = self as *mut Emulator;
+                        unsafe {
+                            (*self_ptr).vm.run(
+                                &mut (*self_ptr).reader,
+                                &mut *self_ptr,
+                                action_idx,
+                                name,
+                            );
                         }
                     }
                 }
@@ -244,8 +263,8 @@ impl Emulator {
 
         // Handle ended sounds
         if !self.audio.is_playing() {
-            if let Some(ref owner) = self.audio.music_owner.clone() {
-                if let Some(movie) = self.sprites.get_mut(owner) {
+            if let Some(owner) = self.audio.music_owner.clone() {
+                if let Some(movie) = self.sprites.get_mut(&owner) {
                     movie.sound_channel = None;
                 }
                 self.audio.music_owner = None;
@@ -377,10 +396,15 @@ impl VmHost for Emulator {
 
     fn stop_sounds(&mut self, target: &str) {
         if target.is_empty() {
+            // Stop all sounds and clear all sound_channel flags
             self.audio.stop_all();
-        } else if let Some(movie) = self.sprites.get_mut(target) {
-            if movie.sound_channel.is_some() {
-                self.audio.stop_all();
+            for (_, movie) in self.sprites.iter_mut() {
+                movie.sound_channel = None;
+            }
+        } else {
+            // Stop only the sound owned by this movie
+            self.audio.stop_for_movie(target);
+            if let Some(movie) = self.sprites.get_mut(target) {
                 movie.sound_channel = None;
             }
         }
@@ -448,7 +472,7 @@ impl VmHost for Emulator {
     fn remove_sprite(&mut self, name: &str) {
         if let Some(movie) = self.sprites.remove(name) {
             if movie.sound_channel.is_some() {
-                self.audio.stop_all();
+                self.audio.stop_for_movie(name);
             }
         }
     }
