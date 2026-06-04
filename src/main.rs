@@ -236,9 +236,7 @@ impl Emulator {
 
                 if let Some((sound, action)) = frame_data {
                     // Play sound if present and track it on the movie
-                    if sound != 0
-                        && self.audio.play_sound(&mut self.reader, sound, name)
-                    {
+                    if sound != 0 && self.audio.play_sound(&mut self.reader, sound, name) {
                         if let Some(movie) = self.sprites.get_mut(name) {
                             movie.sound_channel = Some(0);
                         }
