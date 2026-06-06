@@ -10,10 +10,17 @@ use crate::renderer::Renderer;
 use crate::save_manager::SaveManager;
 use crate::sprite_system::{MovieState, SpriteSystem};
 use anyhow::{Context, Result};
+use std::path::PathBuf;
 
-/// The core emulator state, without window/audio dependencies.
+/// The platform-independent emulator core.
+///
+/// This holds all the game simulation state and is shared by both the
+/// standalone (minifb window) front-end and the libretro core. Platform
+/// specifics (window management, audio output device, input source) live in the
+/// respective front-ends; the core only consumes already-decoded input button
+/// codes and produces a framebuffer plus audio samples.
 pub struct Emulator {
-    pub filename: String,
+    pub filename: PathBuf,
     pub reader: Native32Reader,
     pub sprites: SpriteSystem,
     pub frame_player: FramePlayer,
@@ -29,10 +36,10 @@ pub struct Emulator {
 }
 
 impl Emulator {
-    /// Create a new emulator from a file path.
-    pub fn new_from_file(path: &str) -> Result<Self> {
-        let data =
-            std::fs::read(path).with_context(|| format!("Failed to read game file: {}", path))?;
+    /// Create a new emulator from a game file path.
+    pub fn from_path(path: PathBuf, volume: u32) -> Result<Self> {
+        let data = std::fs::read(&path)
+            .with_context(|| format!("Failed to read game file: {}", path.display()))?;
 
         let mut reader = Native32Reader::new(data);
         reader.init().context("Failed to initialize game file")?;
@@ -40,18 +47,17 @@ impl Emulator {
         let resolution = reader.resolution;
         let colorspace = reader.colorspace;
 
-        let input = InputHandler::new();
-        let save_manager = SaveManager::new(&std::path::PathBuf::from(path));
+        let save_manager = SaveManager::new(&path);
 
         Ok(Self {
-            filename: path.to_string(),
+            filename: path,
             reader,
             sprites: SpriteSystem::new(),
             frame_player: FramePlayer::new(),
             vm: ActionVM::new(),
-            audio: AudioEngine::new(colorspace, 100),
+            audio: AudioEngine::new(colorspace, volume),
             renderer: Renderer::new(resolution.0, resolution.1),
-            input,
+            input: InputHandler::new(),
             save_manager,
             content_loader: ContentLoader::new(),
             cur_frame_objects: Vec::new(),
@@ -290,9 +296,8 @@ impl Emulator {
 
     /// Switch to a new content file (for SSL_PlayNext).
     fn switch_content(&mut self, filename: &str) -> anyhow::Result<()> {
-        let fullpath =
-            ContentLoader::find_content_file(&std::path::PathBuf::from(&self.filename), filename)
-                .ok_or_else(|| anyhow::anyhow!("Content file not found: {}", filename))?;
+        let fullpath = ContentLoader::find_content_file(&self.filename, filename)
+            .ok_or_else(|| anyhow::anyhow!("Content file not found: {}", filename))?;
 
         log::info!("Loading content: {}", fullpath.display());
 
@@ -310,11 +315,11 @@ impl Emulator {
         // Load new file
         let data = std::fs::read(&fullpath)
             .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", fullpath.display(), e))?;
-        self.filename = fullpath.to_string_lossy().to_string();
+        self.save_manager = SaveManager::new(&fullpath);
+        self.filename = fullpath;
         self.reader = Native32Reader::new(data);
         self.reader.init()?;
         self.audio = AudioEngine::new(self.reader.colorspace, (self.audio.volume * 100.0) as u32);
-        self.save_manager = SaveManager::new(&fullpath);
         self.cur_frame_objects.clear();
 
         Ok(())

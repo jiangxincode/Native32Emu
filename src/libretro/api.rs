@@ -153,7 +153,7 @@ pub extern "C" fn retro_load_game(info: *const retro_game_info) -> bool {
         );
 
         // Create emulator instance
-        match Emulator::new_from_file(path) {
+        match Emulator::from_path(std::path::PathBuf::from(path), 100) {
             Ok(emu) => {
                 let (width, height) = emu.get_resolution();
                 log::info!("Game loaded: {} ({}x{})", path, width, height);
