@@ -156,7 +156,7 @@ impl AudioEngine {
     }
 
     #[cfg(not(feature = "standalone"))]
-    fn play_mp3(&mut self, data: &[u8], repeat: i32, movie_name: &str) -> bool {
+    fn play_mp3(&mut self, _data: &[u8], _repeat: i32, _movie_name: &str) -> bool {
         // In libretro mode, we need to decode MP3 and store samples in buffer
         // For now, we'll use a simple approach: decode and store
         // TODO: Implement proper MP3 decoding for libretro mode
@@ -170,11 +170,6 @@ impl AudioEngine {
     #[cfg(not(feature = "standalone"))]
     fn play_raw(&mut self, data: &[u8], repeat: i32, movie_name: &str) -> bool {
         log::debug!("Raw audio playback requested (libretro mode)");
-
-        let sample_rate = match self.colorspace {
-            Colorspace::YUV => 11025u32,
-            Colorspace::ARGB => 22050u32,
-        };
 
         // Decode raw 16-bit PCM data (little-endian based on the standalone implementation)
         let mono_samples: Vec<i16> = data
