@@ -4,3 +4,4 @@ third_party/
 target/
 .codegraph/
 smoke_results/
+.claude/
