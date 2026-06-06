@@ -1,0 +1,443 @@
+// libretro API implementation.
+
+#![allow(static_mut_refs)]
+#![allow(clippy::not_unsafe_ptr_arg_deref)]
+
+use super::callbacks;
+use super::constants::*;
+use super::types::*;
+use crate::core_emulator::emulator::Emulator;
+use std::ffi::{c_void, CStr};
+use std::ptr;
+
+/// Global emulator instance
+static mut EMULATOR: Option<Emulator> = None;
+
+/// Get a reference to the emulator
+unsafe fn get_emulator() -> &'static Emulator {
+    EMULATOR.as_ref().expect("Emulator not initialized")
+}
+
+/// Get a mutable reference to the emulator
+unsafe fn get_emulator_mut() -> &'static mut Emulator {
+    EMULATOR.as_mut().expect("Emulator not initialized")
+}
+
+// ============================================================
+// Startup functions
+// ============================================================
+
+/// Set environment callback
+#[no_mangle]
+pub extern "C" fn retro_set_environment(cb: retro_environment_t) {
+    callbacks::set_environment(cb);
+}
+
+/// Set video refresh callback
+#[no_mangle]
+pub extern "C" fn retro_set_video_refresh(cb: retro_video_refresh_t) {
+    callbacks::set_video_refresh(cb);
+}
+
+/// Set audio sample callback
+#[no_mangle]
+pub extern "C" fn retro_set_audio_sample(cb: retro_audio_sample_t) {
+    callbacks::set_audio_sample(cb);
+}
+
+/// Set batch audio sample callback
+#[no_mangle]
+pub extern "C" fn retro_set_audio_sample_batch(cb: retro_audio_sample_batch_t) {
+    callbacks::set_audio_sample_batch(cb);
+}
+
+/// Set input poll callback
+#[no_mangle]
+pub extern "C" fn retro_set_input_poll(cb: retro_input_poll_t) {
+    callbacks::set_input_poll(cb);
+}
+
+/// Set input state callback
+#[no_mangle]
+pub extern "C" fn retro_set_input_state(cb: retro_input_state_t) {
+    callbacks::set_input_state(cb);
+}
+
+/// Return API version
+#[no_mangle]
+pub extern "C" fn retro_api_version() -> u32 {
+    RETRO_API_VERSION
+}
+
+/// Initialize the core
+#[no_mangle]
+pub extern "C" fn retro_init() {
+    // Initialize logging
+    callbacks::init_log();
+    log::info!("Native32Emu libretro core initialized");
+}
+
+/// Deinitialize the core
+#[no_mangle]
+pub extern "C" fn retro_deinit() {
+    unsafe {
+        EMULATOR = None;
+    }
+    log::info!("Native32Emu libretro core deinitialized");
+}
+
+/// Get system information
+#[no_mangle]
+pub extern "C" fn retro_get_system_info(info: *mut retro_system_info) {
+    unsafe {
+        (*info) = retro_system_info {
+            library_name: c"Native32Emu".as_ptr(),
+            library_version: c"0.1.0".as_ptr(),
+            valid_extensions: c"smf|sgm|ssl".as_ptr(),
+            need_fullpath: true,
+            block_extract: false,
+        };
+    }
+}
+
+/// Set controller port device
+#[no_mangle]
+pub extern "C" fn retro_set_controller_port_device(_port: u32, _device: u32) {
+    // Native32 only supports basic joypad, ignore device type changes
+}
+
+// ============================================================
+// Running functions
+// ============================================================
+
+/// Load a game
+#[no_mangle]
+pub extern "C" fn retro_load_game(info: *const retro_game_info) -> bool {
+    unsafe {
+        let game_info = &*info;
+
+        // Check if path is valid
+        if game_info.path.is_null() {
+            log::error!("Game path is null");
+            return false;
+        }
+
+        let path = match CStr::from_ptr(game_info.path).to_str() {
+            Ok(p) => p,
+            Err(e) => {
+                log::error!("Invalid game path: {}", e);
+                return false;
+            }
+        };
+
+        // Set pixel format to XRGB8888
+        let pixel_format = retro_pixel_format::RETRO_PIXEL_FORMAT_XRGB8888;
+        let success = callbacks::environment(
+            RETRO_ENVIRONMENT_SET_PIXEL_FORMAT,
+            &pixel_format as *const _ as *mut c_void,
+        );
+        if !success {
+            log::error!("Failed to set pixel format");
+            return false;
+        }
+
+        // Register input descriptors
+        register_input_descriptors();
+
+        // Set performance level hint
+        let perf_level: u32 = 4;
+        callbacks::environment(
+            RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL,
+            &perf_level as *const _ as *mut c_void,
+        );
+
+        // Create emulator instance
+        match Emulator::new_from_file(path) {
+            Ok(emu) => {
+                let (width, height) = emu.get_resolution();
+                log::info!("Game loaded: {} ({}x{})", path, width, height);
+                EMULATOR = Some(emu);
+                true
+            }
+            Err(e) => {
+                log::error!("Failed to load game: {}", e);
+                false
+            }
+        }
+    }
+}
+
+/// Unload the current game
+#[no_mangle]
+pub extern "C" fn retro_unload_game() {
+    unsafe {
+        EMULATOR = None;
+    }
+    log::info!("Game unloaded");
+}
+
+/// Get system audio-video information
+#[no_mangle]
+pub extern "C" fn retro_get_system_av_info(info: *mut retro_system_av_info) {
+    unsafe {
+        let emu = get_emulator();
+        let (width, height) = emu.get_resolution();
+        let sample_rate = emu.get_audio_sample_rate();
+
+        (*info) = retro_system_av_info {
+            geometry: retro_game_geometry {
+                base_width: width,
+                base_height: height,
+                max_width: width,
+                max_height: height,
+                aspect_ratio: width as f32 / height as f32,
+            },
+            timing: retro_system_timing {
+                fps: 30.0,
+                sample_rate,
+            },
+        };
+    }
+}
+
+/// Run one frame of the emulator
+#[no_mangle]
+pub extern "C" fn retro_run() {
+    unsafe {
+        let emu = get_emulator_mut();
+
+        // 1. Poll input
+        callbacks::input_poll();
+
+        // 2. Query joypad button state and convert to Native32 keycodes
+        let buttons = query_joypad_buttons(0);
+        emu.set_buttons(buttons);
+
+        // 3. Handle button events (frame-based actions)
+        emu.handle_buttons();
+
+        // 4. Execute one tick of emulation
+        emu.tick();
+
+        // 5. Render the frame
+        emu.draw();
+
+        // 6. Output video frame
+        let framebuffer = emu.get_framebuffer();
+        let (width, height) = emu.get_resolution();
+        let pitch = width as usize * 4; // XRGB8888 = 4 bytes per pixel
+        callbacks::video_refresh(framebuffer.as_ptr() as *const c_void, width, height, pitch);
+
+        // 7. Output audio samples
+        let audio_samples = emu.get_pending_audio_samples();
+        if !audio_samples.is_empty() {
+            callbacks::audio_sample_batch(
+                audio_samples.as_ptr(),
+                audio_samples.len() / 2, // Stereo: 2 samples per frame
+            );
+        }
+
+        // 8. Update time
+        emu.time_ms += 1000 / 30;
+    }
+}
+
+/// Reset the game
+#[no_mangle]
+pub extern "C" fn retro_reset() {
+    unsafe {
+        if let Some(emu) = EMULATOR.as_mut() {
+            emu.reset();
+            log::info!("Game reset");
+        }
+    }
+}
+
+/// Get the region (always NTSC)
+#[no_mangle]
+pub extern "C" fn retro_get_region() -> u32 {
+    RETRO_REGION_NTSC
+}
+
+// ============================================================
+// Serialization functions (save states)
+// ============================================================
+
+/// Get the size needed for serialization
+#[no_mangle]
+pub extern "C" fn retro_serialize_size() -> usize {
+    unsafe {
+        match EMULATOR.as_ref() {
+            Some(emu) => emu.serialize_size(),
+            None => 0,
+        }
+    }
+}
+
+/// Serialize the emulator state
+#[no_mangle]
+pub extern "C" fn retro_serialize(data: *mut c_void, size: usize) -> bool {
+    unsafe {
+        match EMULATOR.as_mut() {
+            Some(emu) => {
+                if size < emu.serialize_size() {
+                    return false;
+                }
+                let buffer = std::slice::from_raw_parts_mut(data as *mut u8, size);
+                emu.serialize(buffer).is_ok()
+            }
+            None => false,
+        }
+    }
+}
+
+/// Deserialize the emulator state
+#[no_mangle]
+pub extern "C" fn retro_unserialize(data: *const c_void, size: usize) -> bool {
+    unsafe {
+        match EMULATOR.as_mut() {
+            Some(emu) => {
+                let buffer = std::slice::from_raw_parts(data as *const u8, size);
+                emu.deserialize(buffer).is_ok()
+            }
+            None => false,
+        }
+    }
+}
+
+// ============================================================
+// Memory access functions (cheat codes)
+// ============================================================
+
+/// Get memory data pointer
+#[no_mangle]
+pub extern "C" fn retro_get_memory_data(_id: u32) -> *mut c_void {
+    // Not implemented yet
+    ptr::null_mut()
+}
+
+/// Get memory size
+#[no_mangle]
+pub extern "C" fn retro_get_memory_size(_id: u32) -> usize {
+    // Not implemented yet
+    0
+}
+
+// ============================================================
+// Cheat functions (not implemented)
+// ============================================================
+
+/// Reset cheat codes
+#[no_mangle]
+pub extern "C" fn retro_cheat_reset() {
+    // Not implemented
+}
+
+/// Set a cheat code
+#[no_mangle]
+pub extern "C" fn retro_cheat_set(_index: u32, _enabled: bool, _code: *const std::ffi::c_char) {
+    // Not implemented
+}
+
+/// Load a special game (not used)
+#[no_mangle]
+pub extern "C" fn retro_load_game_special(
+    _game_type: u32,
+    _info: *const retro_game_info,
+    _num_info: usize,
+) -> bool {
+    false
+}
+
+// ============================================================
+// Helper functions
+// ============================================================
+
+/// Register input descriptors with the frontend
+fn register_input_descriptors() {
+    let descriptors = [
+        retro_input_descriptor {
+            port: 0,
+            device: RETRO_DEVICE_JOYPAD,
+            index: 0,
+            id: RETRO_DEVICE_ID_JOYPAD_LEFT,
+            description: c"Left".as_ptr(),
+        },
+        retro_input_descriptor {
+            port: 0,
+            device: RETRO_DEVICE_JOYPAD,
+            index: 0,
+            id: RETRO_DEVICE_ID_JOYPAD_RIGHT,
+            description: c"Right".as_ptr(),
+        },
+        retro_input_descriptor {
+            port: 0,
+            device: RETRO_DEVICE_JOYPAD,
+            index: 0,
+            id: RETRO_DEVICE_ID_JOYPAD_UP,
+            description: c"Up".as_ptr(),
+        },
+        retro_input_descriptor {
+            port: 0,
+            device: RETRO_DEVICE_JOYPAD,
+            index: 0,
+            id: RETRO_DEVICE_ID_JOYPAD_DOWN,
+            description: c"Down".as_ptr(),
+        },
+        retro_input_descriptor {
+            port: 0,
+            device: RETRO_DEVICE_JOYPAD,
+            index: 0,
+            id: RETRO_DEVICE_ID_JOYPAD_A,
+            description: c"A Button".as_ptr(),
+        },
+        retro_input_descriptor {
+            port: 0,
+            device: RETRO_DEVICE_JOYPAD,
+            index: 0,
+            id: RETRO_DEVICE_ID_JOYPAD_B,
+            description: c"B Button".as_ptr(),
+        },
+        // Terminator
+        retro_input_descriptor {
+            port: 0,
+            device: 0,
+            index: 0,
+            id: 0,
+            description: ptr::null(),
+        },
+    ];
+
+    callbacks::environment(
+        RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
+        descriptors.as_ptr() as *mut c_void,
+    );
+}
+
+/// Query joypad button state and convert to Native32 keycodes
+fn query_joypad_buttons(port: u32) -> u16 {
+    let mut buttons: u16 = 0;
+
+    let state = |id: u32| -> bool { callbacks::input_state(port, RETRO_DEVICE_JOYPAD, 0, id) != 0 };
+
+    if state(RETRO_DEVICE_ID_JOYPAD_LEFT) {
+        buttons |= NATIVE32_KEY_LEFT;
+    }
+    if state(RETRO_DEVICE_ID_JOYPAD_RIGHT) {
+        buttons |= NATIVE32_KEY_RIGHT;
+    }
+    if state(RETRO_DEVICE_ID_JOYPAD_UP) {
+        buttons |= NATIVE32_KEY_UP;
+    }
+    if state(RETRO_DEVICE_ID_JOYPAD_DOWN) {
+        buttons |= NATIVE32_KEY_DOWN;
+    }
+    if state(RETRO_DEVICE_ID_JOYPAD_A) {
+        buttons |= NATIVE32_KEY_B; // SNES A -> Native32 B
+    }
+    if state(RETRO_DEVICE_ID_JOYPAD_B) {
+        buttons |= NATIVE32_KEY_A; // SNES B -> Native32 A
+    }
+
+    buttons
+}

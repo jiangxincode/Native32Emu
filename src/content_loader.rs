@@ -6,6 +6,12 @@ pub struct ContentLoader {
     pub pending_content: Option<String>,
 }
 
+impl Default for ContentLoader {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ContentLoader {
     pub fn new() -> Self {
         Self {

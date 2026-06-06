@@ -1,0 +1,13 @@
+# Native32Emu core info file for RetroArch
+display_name = "Native32 (Native32Emu)"
+authors = "Aloys"
+supported_extensions = "smf|sgm|ssl"
+corename = "native32emu"
+license = "BSD-3-Clause"
+permissions = ""
+display_version = "0.1.0"
+categories = "Game"
+database = "Native32"
+supports_no_game = "false"
+firmware_count = 0
+is_experimental = "false"

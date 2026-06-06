@@ -81,6 +81,12 @@ pub struct ActionVM {
     rng: rand::rngs::StdRng,
 }
 
+impl Default for ActionVM {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ActionVM {
     pub fn new() -> Self {
         use rand::SeedableRng;

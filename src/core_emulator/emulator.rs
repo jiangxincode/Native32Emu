@@ -1,163 +1,55 @@
-// Native32 Emulator - main entry point for standalone mode.
-// This file is only compiled when the "standalone" feature is enabled.
-
-#![allow(dead_code)]
-#![allow(clippy::upper_case_acronyms)]
-#![allow(clippy::manual_memcpy)]
-#![allow(clippy::needless_range_loop)]
-
-mod action_vm;
-mod actions;
-mod audio_engine;
-mod cli;
-mod content_loader;
-mod des_constants;
-mod error;
-mod file_loader;
-mod frame_player;
-mod gamepad_overlay;
-mod header_decryptor;
-mod image_decoder;
-mod input_handler;
-mod renderer;
-mod save_manager;
-mod sprite_system;
-
-use std::path::PathBuf;
-use std::time::{Duration, Instant};
-
-// Platform-specific screen resolution APIs for fullscreen mode
-
-#[cfg(target_os = "windows")]
-mod screen {
-    extern "system" {
-        fn GetSystemMetrics(nIndex: i32) -> i32;
-    }
-    const SM_CXSCREEN: i32 = 0;
-    const SM_CYSCREEN: i32 = 1;
-
-    pub fn get_screen_size() -> (usize, usize) {
-        unsafe {
-            (
-                GetSystemMetrics(SM_CXSCREEN) as usize,
-                GetSystemMetrics(SM_CYSCREEN) as usize,
-            )
-        }
-    }
-}
-
-#[cfg(target_os = "linux")]
-mod screen {
-    // X11 FFI for querying display resolution
-    type Display = *mut core::ffi::c_void;
-    type Window = u64;
-
-    #[link(name = "X11")]
-    extern "system" {
-        fn XOpenDisplay(display_name: *const u8) -> Display;
-        fn XCloseDisplay(display: Display) -> i32;
-        fn XDefaultRootWindow(display: Display) -> Window;
-        fn XDisplayWidth(display: Display, screen_number: i32) -> i32;
-        fn XDisplayHeight(display: Display, screen_number: i32) -> i32;
-    }
-
-    pub fn get_screen_size() -> (usize, usize) {
-        unsafe {
-            let display = XOpenDisplay(std::ptr::null());
-            if display.is_null() {
-                return (800, 600);
-            }
-            let w = XDisplayWidth(display, 0) as usize;
-            let h = XDisplayHeight(display, 0) as usize;
-            let _ = XDefaultRootWindow(display);
-            let _ = XCloseDisplay(display);
-            (w, h)
-        }
-    }
-}
-
-#[cfg(target_os = "macos")]
-mod screen {
-    // macOS Core Graphics FFI for querying main display resolution
-    type CGDirectDisplayID = u32;
-
-    #[link(name = "CoreGraphics", kind = "framework")]
-    extern "C" {
-        fn CGMainDisplayID() -> CGDirectDisplayID;
-        fn CGDisplayPixelsWide(display: CGDirectDisplayID) -> usize;
-        fn CGDisplayPixelsHigh(display: CGDirectDisplayID) -> usize;
-    }
-
-    pub fn get_screen_size() -> (usize, usize) {
-        unsafe {
-            let display = CGMainDisplayID();
-            (CGDisplayPixelsWide(display), CGDisplayPixelsHigh(display))
-        }
-    }
-}
-
-use anyhow::{Context, Result};
-use file_loader::{FrameObject, Native32Reader, ObjectType};
-use sprite_system::{MovieState, SpriteSystem};
+// Core emulator implementation for libretro.
 
 use crate::action_vm::{ActionProp, ActionVM, VmHost};
 use crate::audio_engine::AudioEngine;
-use crate::cli::Cli;
 use crate::content_loader::ContentLoader;
+use crate::file_loader::{FrameObject, Native32Reader, ObjectType};
 use crate::frame_player::FramePlayer;
-use crate::gamepad_overlay::GamepadOverlay;
 use crate::input_handler::InputHandler;
 use crate::renderer::Renderer;
 use crate::save_manager::SaveManager;
+use crate::sprite_system::{MovieState, SpriteSystem};
+use anyhow::{Context, Result};
 
-/// The main emulator state.
-struct Emulator {
-    filename: PathBuf,
-    reader: Native32Reader,
-    sprites: SpriteSystem,
-    frame_player: FramePlayer,
-    vm: ActionVM,
-    audio: AudioEngine,
-    renderer: Renderer,
-    input: InputHandler,
-    save_manager: SaveManager,
-    content_loader: ContentLoader,
-    cur_frame_objects: Vec<FrameObject>,
-    tick_count: u64,
-    time_ms: u32,
-    scale: u32,
-    show_gamepad: bool,
-    _debug: bool,
+/// The core emulator state, without window/audio dependencies.
+pub struct Emulator {
+    pub filename: String,
+    pub reader: Native32Reader,
+    pub sprites: SpriteSystem,
+    pub frame_player: FramePlayer,
+    pub vm: ActionVM,
+    pub audio: AudioEngine,
+    pub renderer: Renderer,
+    pub input: InputHandler,
+    pub save_manager: SaveManager,
+    pub content_loader: ContentLoader,
+    pub cur_frame_objects: Vec<FrameObject>,
+    pub tick_count: u64,
+    pub time_ms: u32,
 }
 
 impl Emulator {
-    fn new(
-        filename: PathBuf,
-        data: Vec<u8>,
-        scale: u32,
-        volume: u32,
-        debug: bool,
-        show_gamepad: bool,
-        key_remappings: &[(u16, minifb::Key)],
-    ) -> Result<Self> {
+    /// Create a new emulator from a file path.
+    pub fn new_from_file(path: &str) -> Result<Self> {
+        let data =
+            std::fs::read(path).with_context(|| format!("Failed to read game file: {}", path))?;
+
         let mut reader = Native32Reader::new(data);
         reader.init().context("Failed to initialize game file")?;
 
         let resolution = reader.resolution;
         let colorspace = reader.colorspace;
 
-        let mut input = InputHandler::new();
-        input.remap(key_remappings);
-
-        let save_manager = SaveManager::new(&filename);
+        let input = InputHandler::new();
+        let save_manager = SaveManager::new(&std::path::PathBuf::from(path));
 
         Ok(Self {
-            filename,
+            filename: path.to_string(),
             reader,
             sprites: SpriteSystem::new(),
             frame_player: FramePlayer::new(),
             vm: ActionVM::new(),
-            audio: AudioEngine::new(colorspace, volume),
+            audio: AudioEngine::new(colorspace, 100),
             renderer: Renderer::new(resolution.0, resolution.1),
             input,
             save_manager,
@@ -165,14 +57,29 @@ impl Emulator {
             cur_frame_objects: Vec::new(),
             tick_count: 0,
             time_ms: 0,
-            scale,
-            show_gamepad,
-            _debug: debug,
         })
     }
 
+    /// Get the game resolution.
+    pub fn get_resolution(&self) -> (u32, u32) {
+        self.reader.resolution
+    }
+
+    /// Get the audio sample rate based on colorspace.
+    pub fn get_audio_sample_rate(&self) -> f64 {
+        match self.reader.colorspace {
+            crate::file_loader::Colorspace::YUV => 11025.0,
+            crate::file_loader::Colorspace::ARGB => 22050.0,
+        }
+    }
+
+    /// Set button state from libretro input.
+    pub fn set_buttons(&mut self, buttons: u16) {
+        self.input.set_buttons(buttons);
+    }
+
     /// Load a new frame and set up sprites.
-    fn load_frame(&mut self, frame: u32) {
+    pub fn load_frame(&mut self, frame: u32) {
         if let Some(objects) = self.reader.get_frame(frame) {
             self.cur_frame_objects = objects.clone();
             self.sprites.update_for_frame(&objects);
@@ -183,7 +90,7 @@ impl Emulator {
     }
 
     /// Run one tick of the emulation (called at 30fps).
-    fn tick(&mut self) {
+    pub fn tick(&mut self) {
         self.tick_count += 1;
 
         // Advance main timeline
@@ -271,7 +178,6 @@ impl Emulator {
         }
 
         // Process pending movie frame switches
-        // Collect names first to avoid borrow conflicts
         let names: Vec<String> = self.sprites.sprites.keys().cloned().collect();
         for name in &names {
             let next = self.sprites.get(name).and_then(|m| m.next_frame);
@@ -285,9 +191,6 @@ impl Emulator {
                     movie.next_frame = None;
                 }
 
-                // Collect sound/action data to avoid borrow conflicts
-                // (self.audio.play_sound needs &mut self.reader and &mut self.audio,
-                //  while we also need &mut self.sprites for sound_channel)
                 let frame_data = {
                     let movie = match self.sprites.get(name) {
                         Some(m) => m,
@@ -338,9 +241,9 @@ impl Emulator {
         }
     }
 
-    /// Handle button presses from the window.
-    fn handle_buttons(&mut self, window: &minifb::Window) {
-        let pressed = self.input.get_pressed_keycodes(window);
+    /// Handle button presses from libretro input.
+    pub fn handle_buttons(&mut self) {
+        let pressed = self.input.get_pressed_buttons();
         let button_events: Vec<(u32, Vec<(u16, u16)>)> = self
             .cur_frame_objects
             .iter()
@@ -371,63 +274,51 @@ impl Emulator {
     }
 
     /// Draw the current frame to the renderer's buffer.
-    fn draw(&mut self) {
+    pub fn draw(&mut self) {
         self.renderer
             .draw_frame(&mut self.reader, &self.sprites, &self.cur_frame_objects);
     }
 
-    /// Draw the virtual gamepad overlay if enabled.
-    fn draw_gamepad_overlay(&mut self, window: &minifb::Window) {
-        if !self.show_gamepad {
-            return;
-        }
-        let pressed: std::collections::HashSet<u16> = self
-            .input
-            .get_pressed_keycodes(window)
-            .into_iter()
-            .collect();
-        let resolution = self.reader.resolution;
-        GamepadOverlay::draw(
-            &mut self.renderer.buffer,
-            resolution.0,
-            resolution.1,
-            self.scale,
-            &pressed,
-        );
+    /// Get the framebuffer as a slice of u32 (XRGB8888).
+    pub fn get_framebuffer(&self) -> &[u32] {
+        &self.renderer.buffer
     }
 
-    /// Switch to new content (SSL multi-file).
-    fn switch_content(&mut self, filename: &str) -> Result<()> {
-        let fullpath = ContentLoader::find_content_file(&self.filename, filename)
-            .ok_or_else(|| anyhow::anyhow!("Content file not found: {}", filename))?;
+    /// Get pending audio samples as i16 interleaved stereo.
+    pub fn get_pending_audio_samples(&mut self) -> Vec<i16> {
+        self.audio.get_pending_samples()
+    }
 
-        log::info!("Loading content: {}", fullpath.display());
-
-        // Stop all sounds
-        self.audio.stop_all();
-
-        // Reset state
+    /// Reset the emulator state.
+    pub fn reset(&mut self) {
         self.tick_count = 0;
         self.time_ms = 0;
         self.sprites = SpriteSystem::new();
         self.frame_player = FramePlayer::new();
         self.vm = ActionVM::new();
-        self.content_loader = ContentLoader::new();
+        self.audio.stop_all();
+    }
 
-        // Load new file
-        let data = std::fs::read(&fullpath)
-            .with_context(|| format!("Failed to read {}", fullpath.display()))?;
-        self.filename = fullpath;
-        self.reader = Native32Reader::new(data);
-        self.reader.init()?;
-        self.audio = AudioEngine::new(self.reader.colorspace, (self.audio.volume * 100.0) as u32);
-        self.save_manager = SaveManager::new(&self.filename);
+    /// Get the size needed for serialization.
+    pub fn serialize_size(&self) -> usize {
+        // Estimate: 1MB should be enough for most games
+        1024 * 1024
+    }
 
+    /// Serialize the emulator state to a buffer.
+    pub fn serialize(&self, _buffer: &mut [u8]) -> Result<()> {
+        // TODO: Implement serialization
+        Ok(())
+    }
+
+    /// Deserialize the emulator state from a buffer.
+    pub fn deserialize(&mut self, _buffer: &[u8]) -> Result<()> {
+        // TODO: Implement deserialization
         Ok(())
     }
 }
 
-/// Implement the VmHost trait for the Emulator so the Action VM can control it.
+/// VmHost trait implementation for the Emulator.
 impl VmHost for Emulator {
     fn stop(&mut self, target: &str) {
         if target.is_empty() {
@@ -466,13 +357,11 @@ impl VmHost for Emulator {
 
     fn stop_sounds(&mut self, target: &str) {
         if target.is_empty() {
-            // Stop all sounds and clear all sound_channel flags
             self.audio.stop_all();
             for (_, movie) in self.sprites.iter_mut() {
                 movie.sound_channel = None;
             }
         } else {
-            // Stop only the sound owned by this movie
             self.audio.stop_for_movie(target);
             if let Some(movie) = self.sprites.get_mut(target) {
                 movie.sound_channel = None;
@@ -509,11 +398,6 @@ impl VmHost for Emulator {
                 ActionProp::Y => movie.y.to_string(),
                 ActionProp::Visible => (movie.visible as i32).to_string(),
                 ActionProp::CurrentFrame => {
-                    // When a frame change is pending (e.g. set by GotoFrame2 within
-                    // the same tick), report the pending target frame. Otherwise the
-                    // stale current frame would be returned, which breaks games that
-                    // read _currentframe right after redirecting a movie (e.g. the
-                    // attack-animation logic in EBBLADE / EMETAL).
                     if let Some(nf) = movie.next_frame {
                         (nf.max(0) as u32 + 1).to_string()
                     } else if movie.playing {
@@ -640,7 +524,6 @@ impl VmHost for Emulator {
                 }
             }
             "GetFileNum" | "GetContext" => {
-                // These are game-specific queries that we can safely ignore
                 log::debug!("Ignoring GetUrl2('{}', '{}')", url, target);
             }
             _ => {
@@ -673,155 +556,4 @@ fn str_to_float(s: &str) -> f64 {
         return 0.0;
     }
     s.parse::<f64>().unwrap_or(0.0)
-}
-
-fn main() -> Result<()> {
-    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
-        .format_timestamp_millis()
-        .init();
-
-    let cli = Cli::parse_args();
-
-    // Validate game path
-    let game_path = match &cli.game_path {
-        Some(p) => p.clone(),
-        None => {
-            eprintln!("Error: No game file specified.");
-            eprintln!("Usage: native32-emu [OPTIONS] <GAME_PATH>");
-            eprintln!("Run with --help for more information.");
-            std::process::exit(1);
-        }
-    };
-
-    if !game_path.exists() {
-        eprintln!("Error: Game file not found: {}", game_path.display());
-        std::process::exit(1);
-    }
-
-    // Read game file
-    let data = std::fs::read(&game_path)
-        .with_context(|| format!("Failed to read game file: {}", game_path.display()))?;
-
-    log::info!(
-        "Loading game: {} ({} bytes)",
-        game_path.display(),
-        data.len()
-    );
-
-    // Parse key remappings
-    let key_remappings = cli.parse_key_remappings();
-
-    // Create emulator
-    let mut emu = Emulator::new(
-        game_path,
-        data,
-        cli.scale,
-        cli.volume,
-        cli.debug,
-        cli.show_gamepad,
-        &key_remappings,
-    )?;
-
-    let resolution = emu.reader.resolution;
-    let display_width = resolution.0 * cli.scale;
-    let display_height = resolution.1 * cli.scale;
-    let (buf_width, buf_height) = (resolution.0, resolution.1);
-
-    // For fullscreen, get screen resolution before creating the window
-    // so minifb creates the window at the correct size from the start.
-    let (window_width, window_height) = if cli.fullscreen {
-        let (sw, sh) = screen::get_screen_size();
-        (sw, sh)
-    } else {
-        (display_width as usize, display_height as usize)
-    };
-
-    // Create window
-    let window_opts = minifb::WindowOptions {
-        resize: !cli.fullscreen,
-        borderless: cli.fullscreen,
-        scale_mode: minifb::ScaleMode::AspectRatioStretch,
-        ..Default::default()
-    };
-
-    let mut window = minifb::Window::new(
-        "Native32 Emulator",
-        window_width,
-        window_height,
-        window_opts,
-    )
-    .context("Failed to create window")?;
-
-    // Apply fullscreen settings
-    if cli.fullscreen {
-        window.topmost(true);
-        window.set_position(0, 0);
-    }
-
-    // Limit to 30fps
-    window.set_target_fps(30);
-
-    let frame_duration = Duration::from_millis(1000 / 30);
-
-    // Main emulation loop
-    let mut frame_count: u32 = 0;
-    let screenshot_path = cli.screenshot.clone();
-
-    while window.is_open() && !window.is_key_down(minifb::Key::Escape) {
-        let frame_start = Instant::now();
-
-        // Handle button input
-        emu.handle_buttons(&window);
-
-        // Tick emulation
-        emu.tick();
-
-        // Draw frame
-        emu.draw();
-
-        // Draw gamepad overlay if enabled
-        emu.draw_gamepad_overlay(&window);
-
-        // Update window
-        window
-            .update_with_buffer(
-                &emu.renderer.buffer,
-                buf_width as usize,
-                buf_height as usize,
-            )
-            .context("Failed to update display")?;
-
-        // Handle content switching
-        if emu.content_loader.has_pending() {
-            if let Some(filename) = emu.content_loader.take_pending() {
-                if let Err(e) = emu.switch_content(&filename) {
-                    log::error!("Failed to switch content: {}", e);
-                }
-            }
-        }
-
-        // Update time
-        emu.time_ms += 1000 / 30;
-        frame_count += 1;
-
-        // Take screenshot if requested
-        if let Some(ref path) = screenshot_path {
-            if frame_count >= cli.screenshot_frames {
-                emu.renderer
-                    .save_screenshot(path)
-                    .context("Failed to save screenshot")?;
-                log::info!("Screenshot saved to: {}", path.display());
-                break;
-            }
-        }
-
-        // Frame timing
-        let elapsed = frame_start.elapsed();
-        if elapsed < frame_duration {
-            std::thread::sleep(frame_duration - elapsed);
-        }
-    }
-
-    log::info!("Emulator exited normally");
-    Ok(())
 }

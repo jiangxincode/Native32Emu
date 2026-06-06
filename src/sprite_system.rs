@@ -40,6 +40,12 @@ pub struct SpriteSystem {
     pub sprites: SpriteMap,
 }
 
+impl Default for SpriteSystem {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SpriteSystem {
     pub fn new() -> Self {
         Self {
