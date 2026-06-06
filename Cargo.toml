@@ -29,6 +29,7 @@ env_logger = { version = "0.11", optional = true }
 
 [dev-dependencies]
 cargo-husky = { version = "1", default-features = false, features = ["precommit-hook", "run-cargo-fmt", "run-cargo-clippy"] }
+tempfile = "3"
 
 [features]
 default = ["standalone"]

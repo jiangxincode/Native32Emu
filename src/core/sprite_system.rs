@@ -132,3 +132,231 @@ impl SpriteSystem {
         self.sprites.contains_key(name)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::core::file_loader::{FrameObject, ObjectType};
+
+    fn make_movie_object(name: &str, index: u16, x: i16, y: i16, depth: u16) -> FrameObject {
+        FrameObject {
+            obj_type: ObjectType::Movie,
+            index,
+            x,
+            y,
+            depth,
+            name: Some(name.to_string()),
+        }
+    }
+
+    #[test]
+    fn test_new_system_is_empty() {
+        let ss = SpriteSystem::new();
+        assert_eq!(ss.sprites.len(), 0);
+    }
+
+    #[test]
+    fn test_default_trait() {
+        let ss = SpriteSystem::default();
+        assert_eq!(ss.sprites.len(), 0);
+    }
+
+    #[test]
+    fn test_insert_and_get() {
+        let mut ss = SpriteSystem::new();
+        let state = MovieState::new(1, 10, 20, 5);
+        ss.insert("hero".to_string(), state);
+
+        let movie = ss.get("hero").unwrap();
+        assert_eq!(movie.movie, 1);
+        assert_eq!(movie.x, 10);
+        assert_eq!(movie.y, 20);
+        assert_eq!(movie.depth, 5);
+    }
+
+    #[test]
+    fn test_get_nonexistent_returns_none() {
+        let ss = SpriteSystem::new();
+        assert!(ss.get("missing").is_none());
+    }
+
+    #[test]
+    fn test_contains_key() {
+        let mut ss = SpriteSystem::new();
+        assert!(!ss.contains_key("a"));
+        ss.insert("a".to_string(), MovieState::new(1, 0, 0, 0));
+        assert!(ss.contains_key("a"));
+    }
+
+    #[test]
+    fn test_remove() {
+        let mut ss = SpriteSystem::new();
+        ss.insert("a".to_string(), MovieState::new(1, 0, 0, 0));
+        let removed = ss.remove("a");
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().movie, 1);
+        assert!(!ss.contains_key("a"));
+    }
+
+    #[test]
+    fn test_remove_nonexistent_returns_none() {
+        let mut ss = SpriteSystem::new();
+        assert!(ss.remove("missing").is_none());
+    }
+
+    #[test]
+    fn test_update_for_frame_adds_new_movies() {
+        let mut ss = SpriteSystem::new();
+        let objects = vec![make_movie_object("hero", 1, 10, 20, 0)];
+        ss.update_for_frame(&objects);
+
+        assert!(ss.contains_key("hero"));
+        let movie = ss.get("hero").unwrap();
+        assert_eq!(movie.movie, 1);
+        assert_eq!(movie.x, 10);
+        assert_eq!(movie.y, 20);
+        assert!(movie.visible);
+        assert!(movie.playing);
+        assert!(!movie.cloned);
+        assert_eq!(movie.next_frame, Some(0));
+    }
+
+    #[test]
+    fn test_update_for_frame_preserves_existing_state() {
+        let mut ss = SpriteSystem::new();
+        let mut state = MovieState::new(1, 0, 0, 0);
+        state.frame = 42;
+        state.visible = false;
+        ss.insert("hero".to_string(), state);
+
+        // Same movie in new frame
+        let objects = vec![make_movie_object("hero", 1, 10, 20, 0)];
+        ss.update_for_frame(&objects);
+
+        let movie = ss.get("hero").unwrap();
+        assert_eq!(movie.frame, 42, "frame should be preserved");
+        assert!(!movie.visible, "visibility should be preserved");
+    }
+
+    #[test]
+    fn test_update_for_frame_removes_non_cloned_absent_movies() {
+        let mut ss = SpriteSystem::new();
+        ss.insert("old".to_string(), MovieState::new(1, 0, 0, 0));
+
+        // Empty frame - "old" should be removed
+        ss.update_for_frame(&[]);
+        assert!(!ss.contains_key("old"));
+    }
+
+    #[test]
+    fn test_update_for_frame_keeps_cloned_movies() {
+        let mut ss = SpriteSystem::new();
+        let mut state = MovieState::new(1, 0, 0, 0);
+        state.cloned = true;
+        ss.insert("clone".to_string(), state);
+
+        ss.update_for_frame(&[]);
+        assert!(ss.contains_key("clone"), "cloned movie should survive");
+    }
+
+    #[test]
+    fn test_update_for_frame_ignores_non_movie_objects() {
+        let mut ss = SpriteSystem::new();
+        let objects = vec![FrameObject {
+            obj_type: ObjectType::Image,
+            index: 1,
+            x: 0,
+            y: 0,
+            depth: 0,
+            name: Some("not_a_movie".to_string()),
+        }];
+        ss.update_for_frame(&objects);
+        assert!(!ss.contains_key("not_a_movie"));
+    }
+
+    #[test]
+    fn test_update_for_frame_multiple_movies() {
+        let mut ss = SpriteSystem::new();
+        let objects = vec![
+            make_movie_object("a", 1, 0, 0, 0),
+            make_movie_object("b", 2, 10, 20, 1),
+            make_movie_object("c", 3, 30, 40, 2),
+        ];
+        ss.update_for_frame(&objects);
+        assert_eq!(ss.sprites.len(), 3);
+    }
+
+    #[test]
+    fn test_movie_state_new_defaults() {
+        let ms = MovieState::new(5, 100, 200, 10);
+        assert_eq!(ms.movie, 5);
+        assert_eq!(ms.x, 100);
+        assert_eq!(ms.y, 200);
+        assert_eq!(ms.depth, 10);
+        assert_eq!(ms.frame, 0);
+        assert!(ms.visible);
+        assert!(ms.playing);
+        assert!(!ms.cloned);
+        assert!(ms.sound_channel.is_none());
+        assert_eq!(ms.next_frame, Some(0));
+    }
+
+    #[test]
+    fn test_iter_and_iter_mut() {
+        let mut ss = SpriteSystem::new();
+        ss.insert("a".to_string(), MovieState::new(1, 0, 0, 0));
+        ss.insert("b".to_string(), MovieState::new(2, 0, 0, 0));
+
+        let names: Vec<&String> = ss.iter().map(|(name, _)| name).collect();
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&&"a".to_string()));
+        assert!(names.contains(&&"b".to_string()));
+
+        // Mutate via iter_mut
+        for (_, movie) in ss.iter_mut() {
+            movie.frame = 99;
+        }
+        assert_eq!(ss.get("a").unwrap().frame, 99);
+        assert_eq!(ss.get("b").unwrap().frame, 99);
+    }
+
+    #[test]
+    fn test_get_mut() {
+        let mut ss = SpriteSystem::new();
+        ss.insert("hero".to_string(), MovieState::new(1, 0, 0, 0));
+
+        if let Some(movie) = ss.get_mut("hero") {
+            movie.x = 42;
+            movie.y = 84;
+        }
+        assert_eq!(ss.get("hero").unwrap().x, 42);
+        assert_eq!(ss.get("hero").unwrap().y, 84);
+    }
+
+    #[test]
+    fn test_update_removes_old_and_adds_new() {
+        let mut ss = SpriteSystem::new();
+        ss.insert("old".to_string(), MovieState::new(1, 0, 0, 0));
+
+        let objects = vec![make_movie_object("new", 2, 0, 0, 0)];
+        ss.update_for_frame(&objects);
+
+        assert!(!ss.contains_key("old"));
+        assert!(ss.contains_key("new"));
+    }
+
+    #[test]
+    fn test_movie_without_name_is_skipped() {
+        let mut ss = SpriteSystem::new();
+        let objects = vec![FrameObject {
+            obj_type: ObjectType::Movie,
+            index: 1,
+            x: 0,
+            y: 0,
+            depth: 0,
+            name: None, // no name
+        }];
+        ss.update_for_frame(&objects);
+        assert_eq!(ss.sprites.len(), 0);
+    }
+}

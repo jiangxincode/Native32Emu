@@ -584,3 +584,258 @@ fn endian_swap_resample(data: &[u8]) -> Vec<u8> {
     }
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // === parse_resolution tests ===
+
+    #[test]
+    fn test_parse_resolution_valid() {
+        assert_eq!(parse_resolution("Resolution_320_240"), Some((320, 240)));
+        assert_eq!(parse_resolution("Resolution_640_480"), Some((640, 480)));
+        assert_eq!(parse_resolution("Resolution_1920_1080"), Some((1920, 1080)));
+    }
+
+    #[test]
+    fn test_parse_resolution_invalid_prefix() {
+        assert_eq!(parse_resolution("Garbage_320_240"), None);
+        assert_eq!(parse_resolution("resolution_320_240"), None); // case-sensitive
+    }
+
+    #[test]
+    fn test_parse_resolution_missing_parts() {
+        assert_eq!(parse_resolution("Resolution_"), None);
+        assert_eq!(parse_resolution("Resolution_320"), None);
+        assert_eq!(parse_resolution("Resolution_abc_240"), None);
+        assert_eq!(parse_resolution("Resolution_320_xyz"), None);
+    }
+
+    #[test]
+    fn test_parse_resolution_empty() {
+        assert_eq!(parse_resolution(""), None);
+    }
+
+    #[test]
+    fn test_parse_resolution_zero_dimensions() {
+        // 0 is technically valid parse, caller checks for > 0
+        assert_eq!(parse_resolution("Resolution_0_0"), Some((0, 0)));
+    }
+
+    // === endian_swap_resample tests ===
+
+    #[test]
+    fn test_endian_swap_resample_two_bytes() {
+        // 2 bytes [0x12, 0x34] → 4 bytes with endian swap
+        let input = vec![0x12, 0x34];
+        let output = endian_swap_resample(&input);
+        assert_eq!(output.len(), 4);
+        // The algorithm doubles the data and swaps bytes within each 16-bit sample
+        // Original: [0x12, 0x34] → pairs: (0x12, 0x34)
+        // Output: swap within pair → [0x34, 0x12, 0x34, 0x12]
+        assert_eq!(output, vec![0x34, 0x12, 0x34, 0x12]);
+    }
+
+    #[test]
+    fn test_endian_swap_resample_four_bytes() {
+        let input = vec![0xAA, 0xBB, 0xCC, 0xDD];
+        let output = endian_swap_resample(&input);
+        assert_eq!(output.len(), 8);
+        // Pairs: (0xAA, 0xBB), (0xCC, 0xDD)
+        // Each pair gets endian-swapped and doubled:
+        // [0xBB, 0xAA, 0xBB, 0xAA, 0xDD, 0xCC, 0xDD, 0xCC]
+        assert_eq!(output, vec![0xBB, 0xAA, 0xBB, 0xAA, 0xDD, 0xCC, 0xDD, 0xCC]);
+    }
+
+    #[test]
+    fn test_endian_swap_resample_empty() {
+        let output = endian_swap_resample(&[]);
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn test_endian_swap_resample_odd_length() {
+        // Odd length: last byte is ignored (len & 0xFFFFFFFE)
+        let input = vec![0x12, 0x34, 0x56];
+        let output = endian_swap_resample(&input);
+        // len = 2 (0x56 ignored), result = 2 * 2 = 4 bytes
+        assert_eq!(output.len(), 4);
+        assert_eq!(output, vec![0x34, 0x12, 0x34, 0x12]);
+    }
+
+    // === ObjectType::from_u16 tests ===
+
+    #[test]
+    fn test_object_type_from_u16_valid() {
+        assert_eq!(ObjectType::from_u16(1), Some(ObjectType::Image));
+        assert_eq!(ObjectType::from_u16(2), Some(ObjectType::Movie));
+        assert_eq!(ObjectType::from_u16(3), Some(ObjectType::Button));
+        assert_eq!(ObjectType::from_u16(4), Some(ObjectType::Action));
+        assert_eq!(ObjectType::from_u16(5), Some(ObjectType::Sound));
+    }
+
+    #[test]
+    fn test_object_type_from_u16_invalid() {
+        assert_eq!(ObjectType::from_u16(0), None);
+        assert_eq!(ObjectType::from_u16(6), None);
+        assert_eq!(ObjectType::from_u16(0xFFFF), None);
+    }
+
+    // === read helper tests ===
+
+    #[test]
+    fn test_read_u16_le() {
+        let data = [0x34, 0x12, 0x78, 0x56];
+        assert_eq!(read_u16_le(&data, 0), 0x1234);
+        assert_eq!(read_u16_le(&data, 2), 0x5678);
+    }
+
+    #[test]
+    fn test_read_i16_le() {
+        let data = [0xFF, 0xFF]; // -1 in i16
+        assert_eq!(read_i16_le(&data, 0), -1);
+        let data = [0x01, 0x00]; // 1
+        assert_eq!(read_i16_le(&data, 0), 1);
+    }
+
+    #[test]
+    fn test_read_u32_le() {
+        let data = [0x78, 0x56, 0x34, 0x12];
+        assert_eq!(read_u32_le(&data, 0), 0x12345678);
+    }
+
+    // === Native32Reader basic tests ===
+
+    #[test]
+    fn test_reader_new_defaults() {
+        let reader = Native32Reader::new(vec![0u8; 100]);
+        assert_eq!(reader.colorspace, Colorspace::YUV);
+        assert_eq!(reader.resolution, (320, 240));
+        assert_eq!(reader.idx, 0);
+        assert_eq!(reader.base, 0);
+    }
+
+    #[test]
+    fn test_reader_skip_thumbnail_no_swft() {
+        let data = vec![0u8; 100];
+        let mut reader = Native32Reader::new(data);
+        reader.skip_thumbnail();
+        assert_eq!(reader.idx, 0); // no SWFT header, idx unchanged
+    }
+
+    #[test]
+    fn test_reader_skip_thumbnail_with_swft() {
+        let mut data = vec![0u8; 256];
+        // Write "SWFT" magic
+        data[0..4].copy_from_slice(b"SWFT");
+        // Thumbnail size at offset 0x0c (relative to idx+4): 16 bytes
+        data[0x10..0x14].copy_from_slice(&16u32.to_le_bytes());
+
+        let mut reader = Native32Reader::new(data);
+        reader.skip_thumbnail();
+        // Should skip: 4 (SWFT) + 0x10 (header) + 16 (size) = 36
+        assert_eq!(reader.idx, 36);
+    }
+
+    #[test]
+    fn test_reader_find_header_yuv() {
+        let mut data = vec![0u8; 256];
+        data[10..14].copy_from_slice(b"_YUV");
+        let mut reader = Native32Reader::new(data);
+        reader.idx = 10;
+        assert!(reader.find_header().is_ok());
+        assert_eq!(reader.colorspace, Colorspace::YUV);
+    }
+
+    #[test]
+    fn test_reader_find_header_argb() {
+        let mut data = vec![0u8; 256];
+        data[20..24].copy_from_slice(b"ARGB");
+        let mut reader = Native32Reader::new(data);
+        reader.idx = 20;
+        assert!(reader.find_header().is_ok());
+        assert_eq!(reader.colorspace, Colorspace::ARGB);
+    }
+
+    #[test]
+    fn test_reader_find_header_not_found() {
+        let data = vec![0u8; 64];
+        let mut reader = Native32Reader::new(data);
+        let result = reader.find_header();
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_reader_get_str() {
+        let data = b"hello\0world".to_vec();
+        let reader = Native32Reader::new(data);
+        assert_eq!(reader.get_str(0), "hello");
+        assert_eq!(reader.get_str(6), "world");
+    }
+
+    #[test]
+    fn test_reader_get_str_at_end_of_data() {
+        let data = b"test".to_vec();
+        let reader = Native32Reader::new(data);
+        assert_eq!(reader.get_str(0), "test");
+    }
+
+    #[test]
+    fn test_frame_object_debug() {
+        let obj = FrameObject {
+            obj_type: ObjectType::Image,
+            index: 5,
+            x: 10,
+            y: 20,
+            depth: 0,
+            name: Some("test".to_string()),
+        };
+        let debug = format!("{:?}", obj);
+        assert!(debug.contains("Image"));
+        assert!(debug.contains("test"));
+    }
+
+    #[test]
+    fn test_movie_frame_copy() {
+        let mf = MovieFrame {
+            image: 1,
+            x: 10,
+            y: 20,
+            action: 0,
+            sound: 0,
+            reserved: 0,
+        };
+        let mf2 = mf; // Copy
+        assert_eq!(mf2.image, 1);
+        assert_eq!(mf2.x, 10);
+    }
+
+    #[test]
+    fn test_colorspace_equality() {
+        assert_eq!(Colorspace::YUV, Colorspace::YUV);
+        assert_eq!(Colorspace::ARGB, Colorspace::ARGB);
+        assert_ne!(Colorspace::YUV, Colorspace::ARGB);
+    }
+
+    #[test]
+    fn test_audio_format_equality() {
+        assert_eq!(AudioFormat::MP3, AudioFormat::MP3);
+        assert_eq!(AudioFormat::Raw, AudioFormat::Raw);
+        assert_ne!(AudioFormat::MP3, AudioFormat::Raw);
+    }
+
+    #[test]
+    fn test_action_payload_variants() {
+        let s = ActionPayload::String("hello".to_string());
+        let i = ActionPayload::Integer(42);
+        match s {
+            ActionPayload::String(v) => assert_eq!(v, "hello"),
+            _ => panic!("expected String"),
+        }
+        match i {
+            ActionPayload::Integer(v) => assert_eq!(v, 42),
+            _ => panic!("expected Integer"),
+        }
+    }
+}

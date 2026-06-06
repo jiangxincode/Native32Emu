@@ -1162,6 +1162,7 @@ dependencies = [
  "minifb",
  "rand 0.10.1",
  "rodio",
+ "tempfile",
  "thiserror 2.0.18",
 ]
 
