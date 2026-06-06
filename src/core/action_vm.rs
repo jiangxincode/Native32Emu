@@ -632,7 +632,7 @@ mod tests {
 
     #[test]
     fn test_str_to_float_valid() {
-        assert_eq!(str_to_float("3.14"), 3.14);
+        assert_eq!(str_to_float("3.25"), 3.25);
         assert_eq!(str_to_float("0"), 0.0);
         assert_eq!(str_to_float("-1.5"), -1.5);
     }
@@ -662,7 +662,7 @@ mod tests {
     #[test]
     fn test_to_string_fn() {
         assert_eq!(to_string(42), "42");
-        assert_eq!(to_string(3.14f64), "3.14");
+        assert_eq!(to_string(3.25f64), "3.25");
         assert_eq!(to_string("hello"), "hello");
     }
 
@@ -1175,7 +1175,7 @@ mod tests {
         // RandomNumber(10) should return 0..9
         let vm = compute_1op("10", Action::RandomNumber);
         let val: i64 = vm.vars.get("r").unwrap().parse().unwrap();
-        assert!(val >= 0 && val < 10);
+        assert!((0..10).contains(&val));
     }
 
     #[test]
