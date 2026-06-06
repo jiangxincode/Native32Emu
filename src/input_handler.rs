@@ -65,26 +65,15 @@ impl InputHandler {
     }
 
     /// Set the currently pressed buttons (libretro mode).
-    pub fn set_buttons(&mut self, buttons: u16) {
+    ///
+    /// Takes the exact Native32 keycodes that are currently pressed. These
+    /// keycodes are NOT independent bit flags (e.g. DOWN 0x1e00 == UP 0x1c00 |
+    /// LEFT 0x0200), so they must be stored verbatim rather than decoded from a
+    /// packed bitmask.
+    pub fn set_buttons(&mut self, keycodes: &[u16]) {
         self.pressed_buttons.clear();
-        // Check each button bit
-        if buttons & 0x0200 != 0 {
-            self.pressed_buttons.insert(0x0200);
-        }
-        if buttons & 0x0400 != 0 {
-            self.pressed_buttons.insert(0x0400);
-        }
-        if buttons & 0x1c00 != 0 {
-            self.pressed_buttons.insert(0x1c00);
-        }
-        if buttons & 0x1e00 != 0 {
-            self.pressed_buttons.insert(0x1e00);
-        }
-        if buttons & 0x4000 != 0 {
-            self.pressed_buttons.insert(0x4000);
-        }
-        if buttons & 0x8800 != 0 {
-            self.pressed_buttons.insert(0x8800);
+        for &keycode in keycodes {
+            self.pressed_buttons.insert(keycode);
         }
     }
 

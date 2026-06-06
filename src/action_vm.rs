@@ -135,7 +135,6 @@ impl ActionVM {
                 Action::SetVariable => {
                     let val = stack.pop().unwrap_or_default();
                     let var = stack.pop().unwrap_or_default();
-                    log::trace!("  {} = {}", var, val);
                     self.vars.insert(var.to_lowercase(), val);
                 }
 

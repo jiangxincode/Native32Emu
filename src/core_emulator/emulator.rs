@@ -74,8 +74,8 @@ impl Emulator {
     }
 
     /// Set button state from libretro input.
-    pub fn set_buttons(&mut self, buttons: u16) {
-        self.input.set_buttons(buttons);
+    pub fn set_buttons(&mut self, keycodes: &[u16]) {
+        self.input.set_buttons(keycodes);
     }
 
     /// Load a new frame and set up sprites.
@@ -239,6 +239,15 @@ impl Emulator {
                 self.audio.music_owner = None;
             }
         }
+
+        // Handle content switching (SSL_PlayNext)
+        if self.content_loader.has_pending() {
+            if let Some(filename) = self.content_loader.take_pending() {
+                if let Err(e) = self.switch_content(&filename) {
+                    log::error!("Failed to switch content: {}", e);
+                }
+            }
+        }
     }
 
     /// Handle button presses from libretro input.
@@ -256,8 +265,8 @@ impl Emulator {
             })
             .collect();
 
-        for (_button_idx, events) in button_events {
-            for (keycode, action_idx) in &events {
+        for (_button_idx, events) in &button_events {
+            for (keycode, action_idx) in events {
                 if pressed.contains(keycode) {
                     let self_ptr = self as *mut Emulator;
                     unsafe {
@@ -277,6 +286,38 @@ impl Emulator {
     pub fn draw(&mut self) {
         self.renderer
             .draw_frame(&mut self.reader, &self.sprites, &self.cur_frame_objects);
+    }
+
+    /// Switch to a new content file (for SSL_PlayNext).
+    fn switch_content(&mut self, filename: &str) -> anyhow::Result<()> {
+        let fullpath =
+            ContentLoader::find_content_file(&std::path::PathBuf::from(&self.filename), filename)
+                .ok_or_else(|| anyhow::anyhow!("Content file not found: {}", filename))?;
+
+        log::info!("Loading content: {}", fullpath.display());
+
+        // Stop all sounds
+        self.audio.stop_all();
+
+        // Reset state
+        self.tick_count = 0;
+        self.time_ms = 0;
+        self.sprites = SpriteSystem::new();
+        self.frame_player = FramePlayer::new();
+        self.vm = ActionVM::new();
+        self.content_loader = ContentLoader::new();
+
+        // Load new file
+        let data = std::fs::read(&fullpath)
+            .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", fullpath.display(), e))?;
+        self.filename = fullpath.to_string_lossy().to_string();
+        self.reader = Native32Reader::new(data);
+        self.reader.init()?;
+        self.audio = AudioEngine::new(self.reader.colorspace, (self.audio.volume * 100.0) as u32);
+        self.save_manager = SaveManager::new(&fullpath);
+        self.cur_frame_objects.clear();
+
+        Ok(())
     }
 
     /// Get the framebuffer as a slice of u32 (XRGB8888).

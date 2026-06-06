@@ -74,6 +74,7 @@ pub extern "C" fn retro_api_version() -> u32 {
 pub extern "C" fn retro_init() {
     // Initialize logging
     callbacks::init_log();
+    super::logger::init();
     log::info!("Native32Emu libretro core initialized");
 }
 
@@ -211,7 +212,7 @@ pub extern "C" fn retro_run() {
 
         // 2. Query joypad button state and convert to Native32 keycodes
         let buttons = query_joypad_buttons(0);
-        emu.set_buttons(buttons);
+        emu.set_buttons(&buttons);
 
         // 3. Handle button events (frame-based actions)
         emu.handle_buttons();
@@ -414,29 +415,34 @@ fn register_input_descriptors() {
     );
 }
 
-/// Query joypad button state and convert to Native32 keycodes
-fn query_joypad_buttons(port: u32) -> u16 {
-    let mut buttons: u16 = 0;
+/// Query joypad button state and convert to Native32 keycodes.
+///
+/// Returns the list of discrete Native32 keycodes that are currently pressed.
+/// The keycodes are intentionally NOT OR-ed into a single bitmask, because the
+/// Native32 directional keycodes overlap (e.g. DOWN 0x1e00 contains all bits of
+/// UP 0x1c00 plus LEFT 0x0200), which would make a packed mask ambiguous.
+fn query_joypad_buttons(port: u32) -> Vec<u16> {
+    let mut buttons = Vec::new();
 
     let state = |id: u32| -> bool { callbacks::input_state(port, RETRO_DEVICE_JOYPAD, 0, id) != 0 };
 
     if state(RETRO_DEVICE_ID_JOYPAD_LEFT) {
-        buttons |= NATIVE32_KEY_LEFT;
+        buttons.push(NATIVE32_KEY_LEFT);
     }
     if state(RETRO_DEVICE_ID_JOYPAD_RIGHT) {
-        buttons |= NATIVE32_KEY_RIGHT;
+        buttons.push(NATIVE32_KEY_RIGHT);
     }
     if state(RETRO_DEVICE_ID_JOYPAD_UP) {
-        buttons |= NATIVE32_KEY_UP;
+        buttons.push(NATIVE32_KEY_UP);
     }
     if state(RETRO_DEVICE_ID_JOYPAD_DOWN) {
-        buttons |= NATIVE32_KEY_DOWN;
+        buttons.push(NATIVE32_KEY_DOWN);
     }
     if state(RETRO_DEVICE_ID_JOYPAD_A) {
-        buttons |= NATIVE32_KEY_B; // SNES A -> Native32 B
+        buttons.push(NATIVE32_KEY_B); // SNES A -> Native32 B
     }
     if state(RETRO_DEVICE_ID_JOYPAD_B) {
-        buttons |= NATIVE32_KEY_A; // SNES B -> Native32 A
+        buttons.push(NATIVE32_KEY_A); // SNES B -> Native32 A
     }
 
     buttons
