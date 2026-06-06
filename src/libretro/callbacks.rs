@@ -166,7 +166,13 @@ pub fn input_state(port: u32, device: u32, index: u32, id: u32) -> i16 {
 pub fn log_message(level: retro_log_level, msg: &str) {
     unsafe {
         if let Some(log_fn) = CALLBACKS.log {
-            let c_msg = std::ffi::CString::new(msg).unwrap_or_default();
+            // The frontend's log function is printf-style and treats its string
+            // argument as a format string. Our message is already fully
+            // formatted, so any literal '%' must be escaped to '%%' to avoid
+            // format-string interpretation (which would read non-existent
+            // variadic arguments and may crash the frontend).
+            let escaped = msg.replace('%', "%%");
+            let c_msg = std::ffi::CString::new(escaped).unwrap_or_default();
             log_fn(level, c_msg.as_ptr());
         }
     }

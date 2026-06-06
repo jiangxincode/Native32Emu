@@ -341,21 +341,28 @@ impl Emulator {
     }
 
     /// Get the size needed for serialization.
+    ///
+    /// Save states are not implemented yet. Returning 0 tells the libretro
+    /// frontend that this core does not support save states, so it will not
+    /// expose a (silently broken) save/load state action to the user.
     pub fn serialize_size(&self) -> usize {
-        // Estimate: 1MB should be enough for most games
-        1024 * 1024
+        0
     }
 
     /// Serialize the emulator state to a buffer.
+    ///
+    /// Not implemented yet: returns an error so the frontend does not believe a
+    /// save state was successfully captured.
     pub fn serialize(&self, _buffer: &mut [u8]) -> Result<()> {
-        // TODO: Implement serialization
-        Ok(())
+        anyhow::bail!("save states are not supported")
     }
 
     /// Deserialize the emulator state from a buffer.
+    ///
+    /// Not implemented yet: returns an error so the frontend does not believe a
+    /// save state was successfully restored.
     pub fn deserialize(&mut self, _buffer: &[u8]) -> Result<()> {
-        // TODO: Implement deserialization
-        Ok(())
+        anyhow::bail!("save states are not supported")
     }
 }
 

@@ -78,27 +78,27 @@ impl AudioEngine {
             Colorspace::YUV => 11025.0,
             Colorspace::ARGB => 22050.0,
         };
-        let samples_per_frame = (sample_rate / 30.0) as usize;
+        // Number of stereo frames to emit per 30fps video frame.
+        let frames_per_video_frame = (sample_rate / 30.0) as usize;
+        // The buffer is interleaved stereo, so each frame is two i16 values (L + R).
+        let values_per_video_frame = frames_per_video_frame * 2;
 
         // If we have pending samples from play_raw/play_mp3, use those
         if !self.pending_samples.is_empty() {
-            // Take samples_per_frame samples from the buffer
-            let take_count = samples_per_frame.min(self.pending_samples.len());
-            let result: Vec<i16> = self.pending_samples.drain(..take_count).collect();
+            // Take one video frame's worth of interleaved samples from the buffer
+            let take_count = values_per_video_frame.min(self.pending_samples.len());
+            let mut result: Vec<i16> = self.pending_samples.drain(..take_count).collect();
 
             // If we need more samples to fill the frame, pad with silence
-            if result.len() < samples_per_frame {
-                let mut padded = result;
-                padded.resize(samples_per_frame, 0);
-                padded
-            } else {
-                result
+            if result.len() < values_per_video_frame {
+                result.resize(values_per_video_frame, 0);
             }
+            result
         } else if self.tone_active {
             // Generate test tone for debugging
-            let mut samples = Vec::with_capacity(samples_per_frame);
+            let mut samples = Vec::with_capacity(values_per_video_frame);
 
-            for _ in 0..samples_per_frame {
+            for _ in 0..frames_per_video_frame {
                 let sample =
                     (self.tone_phase * 2.0 * std::f64::consts::PI * 440.0 / sample_rate).sin();
                 let sample_i16 = (sample * 16000.0 * self.volume as f64) as i16;
@@ -112,7 +112,7 @@ impl AudioEngine {
             samples
         } else {
             // Return silence
-            vec![0i16; samples_per_frame]
+            vec![0i16; values_per_video_frame]
         }
     }
 
