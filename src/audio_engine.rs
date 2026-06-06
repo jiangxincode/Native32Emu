@@ -71,17 +71,34 @@ impl AudioEngine {
 
     /// Get pending audio samples for libretro mode.
     /// Returns interleaved stereo i16 samples.
+    /// This should be called once per frame in retro_run().
     pub fn get_pending_samples(&mut self) -> Vec<i16> {
-        // For now, generate a simple tone if active
-        if self.tone_active {
-            let sample_rate = match self.colorspace {
-                Colorspace::YUV => 11025.0,
-                Colorspace::ARGB => 22050.0,
-            };
-            let num_samples = (sample_rate / 30.0) as usize; // Samples per frame at 30fps
-            let mut samples = Vec::with_capacity(num_samples * 2);
+        // Calculate how many samples we need per frame at 30fps
+        let sample_rate = match self.colorspace {
+            Colorspace::YUV => 11025.0,
+            Colorspace::ARGB => 22050.0,
+        };
+        let samples_per_frame = (sample_rate / 30.0) as usize;
 
-            for _ in 0..num_samples {
+        // If we have pending samples from play_raw/play_mp3, use those
+        if !self.pending_samples.is_empty() {
+            // Take samples_per_frame samples from the buffer
+            let take_count = samples_per_frame.min(self.pending_samples.len());
+            let result: Vec<i16> = self.pending_samples.drain(..take_count).collect();
+
+            // If we need more samples to fill the frame, pad with silence
+            if result.len() < samples_per_frame {
+                let mut padded = result;
+                padded.resize(samples_per_frame, 0);
+                padded
+            } else {
+                result
+            }
+        } else if self.tone_active {
+            // Generate test tone for debugging
+            let mut samples = Vec::with_capacity(samples_per_frame);
+
+            for _ in 0..samples_per_frame {
                 let sample =
                     (self.tone_phase * 2.0 * std::f64::consts::PI * 440.0 / sample_rate).sin();
                 let sample_i16 = (sample * 16000.0 * self.volume as f64) as i16;
@@ -95,12 +112,7 @@ impl AudioEngine {
             samples
         } else {
             // Return silence
-            let sample_rate = match self.colorspace {
-                Colorspace::YUV => 11025.0,
-                Colorspace::ARGB => 22050.0,
-            };
-            let num_samples = (sample_rate / 30.0) as usize;
-            vec![0i16; num_samples * 2]
+            vec![0i16; samples_per_frame]
         }
     }
 
@@ -144,15 +156,64 @@ impl AudioEngine {
     }
 
     #[cfg(not(feature = "standalone"))]
-    fn play_mp3(&mut self, _data: &[u8], _repeat: i32, _movie_name: &str) -> bool {
-        log::debug!("MP3 playback requested (libretro mode - not implemented)");
+    fn play_mp3(&mut self, data: &[u8], repeat: i32, movie_name: &str) -> bool {
+        // In libretro mode, we need to decode MP3 and store samples in buffer
+        // For now, we'll use a simple approach: decode and store
+        // TODO: Implement proper MP3 decoding for libretro mode
+        log::debug!("MP3 playback requested (libretro mode - simplified implementation)");
+
+        // For MP3, we'll need a decoder. For now, return false to indicate not supported
+        // A proper implementation would use a Rust MP3 decoder library
         false
     }
 
     #[cfg(not(feature = "standalone"))]
-    fn play_raw(&mut self, _data: &[u8], _repeat: i32, _movie_name: &str) -> bool {
-        log::debug!("Raw audio playback requested (libretro mode - not implemented)");
-        false
+    fn play_raw(&mut self, data: &[u8], repeat: i32, movie_name: &str) -> bool {
+        log::debug!("Raw audio playback requested (libretro mode)");
+
+        let sample_rate = match self.colorspace {
+            Colorspace::YUV => 11025u32,
+            Colorspace::ARGB => 22050u32,
+        };
+
+        // Decode raw 16-bit PCM data (little-endian based on the standalone implementation)
+        let mono_samples: Vec<i16> = data
+            .chunks_exact(2)
+            .map(|chunk| i16::from_le_bytes([chunk[0], chunk[1]]))
+            .collect();
+
+        if mono_samples.is_empty() {
+            return false;
+        }
+
+        // Apply volume and convert mono to stereo (libretro expects interleaved stereo)
+        let volume_scale = self.volume;
+        let mut stereo_samples = Vec::with_capacity(mono_samples.len() * 2);
+        for &sample in &mono_samples {
+            let scaled = (sample as f32 * volume_scale) as i16;
+            stereo_samples.push(scaled); // Left
+            stereo_samples.push(scaled); // Right (same as left for mono source)
+        }
+
+        // Store samples in pending buffer based on repeat count
+        let repeat_count = if repeat == 0xFF {
+            // Infinite loop - for now, just play once (could be improved with a loop flag)
+            1
+        } else if repeat > 1 {
+            repeat as usize
+        } else {
+            1
+        };
+
+        // Clear previous samples and add new ones
+        self.pending_samples.clear();
+        for _ in 0..repeat_count {
+            self.pending_samples.extend_from_slice(&stereo_samples);
+        }
+
+        self.music_owner = Some(movie_name.to_string());
+        self.tone_active = false; // Disable test tone when real audio is playing
+        true
     }
 
     #[cfg(feature = "standalone")]
