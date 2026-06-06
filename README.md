@@ -25,6 +25,68 @@ Native32 is a game format developed by Sunplus for DVD player and TV chipsets (c
 - **CLI controls** — scaling, fullscreen, volume adjustment
 - **RetroArch integration** — libretro core for use with RetroArch frontend
 
+## Usage
+
+Download the latest binary from the [Releases](https://github.com/jiangxincode/Native32Emu/releases) page.
+
+### Standalone Mode
+
+```bash
+# Basic usage
+native32-emu path/to/game.smf
+
+# With options
+native32-emu --scale 2 --volume 80 path/to/game.smf
+
+# 2x scaling with 50% volume
+native32-emu --scale 2 --volume 50 game.smf
+
+# Remap A button to Space
+native32-emu --remap "0x4000:space" game.smf
+
+# Fullscreen mode
+native32-emu --fullscreen game.smf
+
+# Take a screenshot after 30 frames and exit
+native32-emu --screenshot screenshot.png --screenshot-frames 30 game.smf
+```
+
+#### Command-line Options
+
+| Option | Description | Default |
+|---|---|---|
+| `<GAME_PATH>` | Path to the game file (`.smf`, `.sgm`, or `.ssl`) | *required* |
+| `-s, --scale <1-16>` | Integer scaling factor | `1` |
+| `-f, --fullscreen` | Run in fullscreen mode | off |
+| `-v, --volume <0-100>` | Volume level (0 = mute, 100 = original) | `100` |
+| `-S, --screenshot <PATH>` | Take a screenshot and exit (saves as PNG) | — |
+| `--screenshot-frames <N>` | Frames to run before screenshot | `30` |
+| `--debug` | Enable debug/development mode | off |
+| `--remap <keycode:key>` | Remap a Native32 keycode to a physical key | — |
+
+#### Default Key Mappings
+
+| Native32 Keycode | Physical Key | Action |
+|---|---|---|
+| `0x0200` | ← Left | Left |
+| `0x0400` | → Right | Right |
+| `0x1c00` | ↑ Up | Up |
+| `0x1e00` | ↓ Down | Down |
+| `0x4000` | Z | A |
+| `0x8800` | X | B / Menu |
+
+### RetroArch Mode
+
+1. **Download the libretro core** from the [Releases](https://github.com/jiangxincode/Native32Emu/releases) page
+2. **Install the core**:
+   - Copy `native32emu_libretro.dll` (or `.so`/`.dylib`) to RetroArch's `cores/` directory
+   - Copy `native32emu_libretro.info` to RetroArch's `info/` directory
+3. **Load the core in RetroArch**:
+   - Open RetroArch
+   - Select "Load Core" → "Native32 (Native32Emu)"
+   - Select "Load Content" and choose a `.smf`, `.sgm`, or `.ssl` game file
+4. **Controls**: Use keyboard or gamepad (D-Pad for directions, Z=A, X=B)
+
 ## Building
 
 Requires [Rust](https://www.rust-lang.org/tools/install) (stable).
@@ -44,75 +106,7 @@ cargo build -p native32emu-libretro --release
 ```
 
 This produces `native32emu_libretro.dll` on Windows (`libnative32emu_libretro.so`
-on Linux, `libnative32emu_libretro.dylib` on macOS) under `target/release/`. The
-file is named exactly the way RetroArch expects, so no renaming is needed.
-
-## Usage
-
-### Standalone Mode
-
-```bash
-# Basic usage
-cargo run -p native32emu -- path/to/game.smf
-
-# With options
-cargo run -p native32emu -- --scale 2 --volume 80 path/to/game.smf
-
-# Release build
-cargo run -p native32emu --release -- path/to/game.smf
-```
-
-### RetroArch Mode
-
-1. **Build the libretro core** (see Building section above)
-2. **Install the core**:
-   - Copy `target/release/native32emu_libretro.dll` (or `.so`/`.dylib`) to RetroArch's `cores/` directory
-   - Copy `crates/native32emu-libretro/native32emu_libretro.info` to RetroArch's `info/` directory
-3. **Load the core in RetroArch**:
-   - Open RetroArch
-   - Select "Load Core" → "Native32 (Native32Emu)"
-   - Select "Load Content" and choose a `.smf`, `.sgm`, or `.ssl` game file
-4. **Controls**: Use keyboard or gamepad (D-Pad for directions, Z=A, X=B)
-
-### Command-line Options
-
-| Option | Description | Default |
-|---|---|---|
-| `<GAME_PATH>` | Path to the game file (`.smf`, `.sgm`, or `.ssl`) | *required* |
-| `-s, --scale <1-16>` | Integer scaling factor | `1` |
-| `-f, --fullscreen` | Run in fullscreen mode | off |
-| `-v, --volume <0-100>` | Volume level (0 = mute, 100 = original) | `100` |
-| `-S, --screenshot <PATH>` | Take a screenshot and exit (saves as PNG) | — |
-| `--screenshot-frames <N>` | Frames to run before screenshot | `30` |
-| `--debug` | Enable debug/development mode | off |
-| `--remap <keycode:key>` | Remap a Native32 keycode to a physical key | — |
-
-### Default Key Mappings
-
-| Native32 Keycode | Physical Key | Action |
-|---|---|---|
-| `0x0200` | ← Left | Left |
-| `0x0400` | → Right | Right |
-| `0x1c00` | ↑ Up | Up |
-| `0x1e00` | ↓ Down | Down |
-| `0x4000` | Z | A |
-| `0x8800` | X | B / Menu |
-
-### Examples
-
-```bash
-# 2x scaling with 50% volume
-cargo run -- --scale 2 --volume 50 native32_game/FHUI.smf
-
-# Remap A button to Space
-cargo run -- --remap "0x4000:space" native32_game/FHUI.smf
-
-# Fullscreen mode
-cargo run -- --fullscreen native32_game/EACT/EBBLADE.smf
-
-# Take a screenshot after 30 frames and exit
-cargo run -- --screenshot screenshot.png --screenshot-frames 30 native32_game/EACT/EBBLADE.smf
-```
+on Linux, `libnative32emu_libretro.dylib` on macOS) under `target/release/`.
 
 ## Testing
 
