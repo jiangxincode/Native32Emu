@@ -6,6 +6,12 @@ pub struct FramePlayer {
     pub next_frame: Option<u32>,
 }
 
+impl Default for FramePlayer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FramePlayer {
     pub fn new() -> Self {
         Self {

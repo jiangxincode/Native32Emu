@@ -5,8 +5,8 @@ use std::collections::HashMap;
 
 use rand::RngExt;
 
-use crate::actions::Action;
-use crate::file_loader::{ActionPayload, Native32Reader};
+use crate::core::actions::Action;
+use crate::core::file_loader::{ActionPayload, Native32Reader};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
@@ -81,6 +81,12 @@ pub struct ActionVM {
     rng: rand::rngs::StdRng,
 }
 
+impl Default for ActionVM {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ActionVM {
     pub fn new() -> Self {
         use rand::SeedableRng;
@@ -129,7 +135,6 @@ impl ActionVM {
                 Action::SetVariable => {
                     let val = stack.pop().unwrap_or_default();
                     let var = stack.pop().unwrap_or_default();
-                    log::trace!("  {} = {}", var, val);
                     self.vars.insert(var.to_lowercase(), val);
                 }
 

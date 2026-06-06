@@ -23,16 +23,48 @@ Native32 is a game format developed by Sunplus for DVD player and TV chipsets (c
 - **Save system** — `.ssl_sav` file persistence
 - **SSL multi-file content** — seamless switching between game levels/files
 - **CLI controls** — scaling, fullscreen, volume adjustment
+- **RetroArch integration** — libretro core for use with RetroArch frontend
 
 ## Building
 
 Requires [Rust](https://www.rust-lang.org/tools/install) (stable).
 
+### Standalone Mode (Default)
+
 ```bash
 cargo build --release
 ```
 
+### Libretro Core (for RetroArch)
+
+Use the helper script, which builds the core and stages it (with the correct
+`_libretro` file name that RetroArch expects) into a `dist/` directory:
+
+```bash
+# Linux / macOS
+./scripts/build-libretro.sh
+
+# Windows (PowerShell)
+./scripts/build-libretro.ps1
+```
+
+This produces `dist/native32emu_libretro.dll` on Windows
+(`native32emu_libretro.so` on Linux, `native32emu_libretro.dylib` on macOS)
+together with `native32emu_libretro.info`, both ready to drop into RetroArch.
+
+If you prefer to build manually:
+
+```bash
+cargo rustc --lib --release --features libretro --no-default-features --crate-type cdylib
+```
+
+Note that a manual build produces `native32emu.dll` (or `libnative32emu.so` /
+`libnative32emu.dylib`); RetroArch requires the file to be renamed with a
+`_libretro` suffix, which the helper script does for you.
+
 ## Usage
+
+### Standalone Mode
 
 ```bash
 # Basic usage
@@ -44,6 +76,18 @@ cargo run -- --scale 2 --volume 80 path/to/game.smf
 # Release build
 cargo run --release -- path/to/game.smf
 ```
+
+### RetroArch Mode
+
+1. **Build the libretro core** (see Building section above)
+2. **Install the core**:
+   - Copy `dist/native32emu_libretro.dll` (or `.so`/`.dylib`) to RetroArch's `cores/` directory
+   - Copy `dist/native32emu_libretro.info` to RetroArch's `info/` directory
+3. **Load the core in RetroArch**:
+   - Open RetroArch
+   - Select "Load Core" → "Native32 (Native32Emu)"
+   - Select "Load Content" and choose a `.smf`, `.sgm`, or `.ssl` game file
+4. **Controls**: Use keyboard or gamepad (D-Pad for directions, Z=A, X=B)
 
 ### Command-line Options
 
@@ -89,25 +133,41 @@ cargo run -- --screenshot screenshot.png --screenshot-frames 30 native32_game/EA
 
 ```
 src/
-├── main.rs              # Emulation loop and VmHost implementation
-├── cli.rs               # Command-line argument parsing
-├── actions.rs           # Action opcode enum (36 opcodes)
-├── action_vm.rs         # Stack-based virtual machine
-├── audio_engine.rs      # MP3/PCM audio playback (rodio)
-├── content_loader.rs    # SSL multi-file content switching
-├── des_constants.rs     # DES permutation tables and S-boxes
-├── error.rs             # Error types
-├── file_loader.rs       # File I/O, header parsing, resource tables
-├── frame_player.rs      # Main timeline frame playback (30fps)
-├── header_decryptor.rs  # Custom DES ECB header decryption
-├── image_decoder.rs     # YUV 4:2:0 and ARGB1555 image decoders
-├── input_handler.rs     # Keyboard input to keycode mapping
-├── renderer.rs          # Frame rendering with depth sorting
-├── save_manager.rs      # Save data persistence (.ssl_sav)
-└── sprite_system.rs     # Movie/sprite instance management
+├── lib.rs                   # Library crate root (module declarations)
+├── main.rs                  # Standalone binary entry point (thin front-end)
+├── core/                    # Platform-independent emulator core (shared)
+│   ├── mod.rs
+│   ├── emulator.rs          # Shared Emulator + VmHost (standalone & libretro)
+│   ├── actions.rs           # Action opcode enum (36 opcodes)
+│   ├── action_vm.rs         # Stack-based virtual machine
+│   ├── audio_engine.rs      # MP3/PCM audio (rodio for standalone, buffer for libretro)
+│   ├── content_loader.rs    # SSL multi-file content switching
+│   ├── des_constants.rs     # DES permutation tables and S-boxes
+│   ├── error.rs             # Error types
+│   ├── file_loader.rs       # File I/O, header parsing, resource tables
+│   ├── frame_player.rs      # Main timeline frame playback (30fps)
+│   ├── header_decryptor.rs  # Custom DES ECB header decryption
+│   ├── image_decoder.rs     # YUV 4:2:0 and ARGB1555 image decoders
+│   ├── input_handler.rs     # Input to keycode mapping (keyboard / RetroPad)
+│   ├── renderer.rs          # Frame rendering with depth sorting
+│   ├── save_manager.rs      # Save data persistence (.ssl_sav)
+│   └── sprite_system.rs     # Movie/sprite instance management
+├── standalone/              # Standalone-only front-end
+│   ├── mod.rs
+│   ├── cli.rs               # Command-line argument parsing
+│   └── gamepad_overlay.rs   # On-screen virtual gamepad overlay
+└── libretro/                # libretro API implementation (feature = "libretro")
+    ├── mod.rs
+    ├── api.rs               # Exported libretro functions (retro_init, retro_run, etc.)
+    ├── callbacks.rs         # Callback management for video/audio/input
+    ├── constants.rs         # libretro constants
+    ├── logger.rs            # Bridges the `log` crate to the libretro log interface
+    └── types.rs             # libretro type definitions
 ```
 
 ## Dependencies
+
+### Standalone Mode
 
 | Crate | Purpose |
 |---|---|
@@ -117,6 +177,41 @@ src/
 | `anyhow` / `thiserror` | Error handling |
 | `log` / `env_logger` | Logging |
 | `rand` | Random number generation (for VM `RandomNumber` opcode) |
+
+### Libretro Mode
+
+The libretro core has minimal dependencies - only the core emulation libraries are used. Window management and audio playback are handled by the RetroArch frontend through callbacks.
+
+## RetroArch Integration
+
+Native32Emu can be used as a libretro core with RetroArch, allowing you to play Native32 games with RetroArch's features like shaders, netplay, and achievements.
+
+### Supported Features
+
+- ✅ Video output (XRGB8888 pixel format)
+- ✅ Audio output (RAW PCM, stereo)
+- ✅ Input handling (D-Pad + A/B buttons)
+- ✅ Game loading (.smf, .sgm, .ssl files)
+- ⚠️ MP3 audio (not yet implemented - only RAW PCM works)
+- ❌ Save states (not yet implemented)
+- ❌ Core options (not yet implemented)
+
+### RetroPad Button Mapping
+
+| RetroPad Button | Native32 Keycode | Action |
+|----------------|------------------|--------|
+| D-Pad Left | 0x0200 | Left |
+| D-Pad Right | 0x0400 | Right |
+| D-Pad Up | 0x1c00 | Up |
+| D-Pad Down | 0x1e00 | Down |
+| A (SNES East) | 0x8800 | B / Menu |
+| B (SNES South) | 0x4000 | A |
+
+### Audio Notes
+
+- **RAW PCM**: Fully supported (11025Hz for YUV games, 22050Hz for ARGB games)
+- **MP3**: Not yet supported in libretro mode (games using MP3 will have no music)
+- Audio is output as stereo (mono sources are duplicated to both channels)
 
 ## Game Compatibility
 
@@ -157,6 +252,7 @@ Contributions are welcome! Whether you're interested in fixing bugs, adding feat
 - **Platform ports** — macOS and Linux testing and packaging
 - **Documentation** — improve wiki pages and code comments
 - **Bug reports** — if you find a game that doesn't work correctly, please open an issue
+- **RetroArch integration** — MP3 audio support, save states, core options
 
 ### Getting Started
 

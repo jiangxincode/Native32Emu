@@ -4,20 +4,38 @@ version = "0.1.0"
 edition = "2021"
 description = "A Native32 game emulator written in Rust"
 
+[lib]
+name = "native32emu"
+crate-type = ["lib"]
+path = "src/lib.rs"
+
+[[bin]]
+name = "native32-emu"
+path = "src/main.rs"
+required-features = ["standalone"]
+
 [dependencies]
-clap = { version = "4", features = ["derive"] }
-minifb = "0.28"
-rodio = { version = "0.22", features = ["mp3"] }
 anyhow = "1"
 thiserror = "2"
 log = "0.4"
-env_logger = "0.11"
 rand = "0.10"
 image = "0.25"
+
+# Standalone mode dependencies (optional)
+clap = { version = "4", features = ["derive"], optional = true }
+minifb = { version = "0.28", optional = true }
+rodio = { version = "0.22", features = ["mp3"], optional = true }
+env_logger = { version = "0.11", optional = true }
 
 [dev-dependencies]
 cargo-husky = { version = "1", default-features = false, features = ["precommit-hook", "run-cargo-fmt", "run-cargo-clippy"] }
 
+[features]
+default = ["standalone"]
+standalone = ["dep:clap", "dep:minifb", "dep:rodio", "dep:env_logger"]
+libretro = []
+
 [profile.release]
 opt-level = 3
 lto = true
+strip = true
