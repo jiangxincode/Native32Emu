@@ -1,0 +1,19 @@
+[package]
+name = "native32emu"
+version.workspace = true
+edition.workspace = true
+description = "Standalone (minifb window) Native32 emulator"
+license.workspace = true
+
+[[bin]]
+name = "native32-emu"
+path = "src/main.rs"
+
+[dependencies]
+native32emu-core = { workspace = true, features = ["standalone"] }
+anyhow.workspace = true
+log.workspace = true
+clap.workspace = true
+minifb.workspace = true
+rodio.workspace = true
+env_logger.workspace = true

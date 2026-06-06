@@ -2,7 +2,7 @@
 // This is NOT a standard DES implementation - it uses the same algorithm
 // as the reference implementation to ensure compatibility.
 
-use crate::core::des_constants::{
+use crate::des_constants::{
     DES_SBOXES, FINAL_MESSAGE_PERMUTATION, INITIAL_KEY_PERMUTATION, INITIAL_MESSAGE_PERMUTATION,
     KEY_SHIFT_SIZES, MESSAGE_SHUFFLE, RIGHT_SUB_MESSAGE_PERMUTATION, SUB_KEY_PERMUTATION,
 };

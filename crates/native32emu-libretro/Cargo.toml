@@ -1,0 +1,17 @@
+[package]
+name = "native32emu-libretro"
+version.workspace = true
+edition.workspace = true
+description = "libretro core for Native32Emu (loadable by RetroArch)"
+license.workspace = true
+
+[lib]
+# Produces native32emu_libretro.{dll,so,dylib} directly, named the way
+# RetroArch expects, so no post-build renaming is needed.
+name = "native32emu_libretro"
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+native32emu-core.workspace = true
+log.workspace = true

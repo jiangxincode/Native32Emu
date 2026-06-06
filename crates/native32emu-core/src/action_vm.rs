@@ -5,8 +5,8 @@ use std::collections::HashMap;
 
 use rand::RngExt;
 
-use crate::core::actions::Action;
-use crate::core::file_loader::{ActionPayload, Native32Reader};
+use crate::actions::Action;
+use crate::file_loader::{ActionPayload, Native32Reader};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
@@ -444,7 +444,7 @@ impl ActionVM {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::file_loader::Native32Reader;
+    use crate::file_loader::Native32Reader;
 
     // === Helper functions ===
 

@@ -32,35 +32,20 @@ Requires [Rust](https://www.rust-lang.org/tools/install) (stable).
 ### Standalone Mode (Default)
 
 ```bash
-cargo build --release
+cargo build -p native32emu --release
 ```
+
+The binary is produced at `target/release/native32-emu`.
 
 ### Libretro Core (for RetroArch)
 
-Use the helper script, which builds the core and stages it (with the correct
-`_libretro` file name that RetroArch expects) into a `dist/` directory:
-
 ```bash
-# Linux / macOS
-./scripts/build-libretro.sh
-
-# Windows (PowerShell)
-./scripts/build-libretro.ps1
+cargo build -p native32emu-libretro --release
 ```
 
-This produces `dist/native32emu_libretro.dll` on Windows
-(`native32emu_libretro.so` on Linux, `native32emu_libretro.dylib` on macOS)
-together with `native32emu_libretro.info`, both ready to drop into RetroArch.
-
-If you prefer to build manually:
-
-```bash
-cargo rustc --lib --release --features libretro --no-default-features --crate-type cdylib
-```
-
-Note that a manual build produces `native32emu.dll` (or `libnative32emu.so` /
-`libnative32emu.dylib`); RetroArch requires the file to be renamed with a
-`_libretro` suffix, which the helper script does for you.
+This produces `native32emu_libretro.dll` on Windows (`libnative32emu_libretro.so`
+on Linux, `libnative32emu_libretro.dylib` on macOS) under `target/release/`. The
+file is named exactly the way RetroArch expects, so no renaming is needed.
 
 ## Usage
 
@@ -68,21 +53,21 @@ Note that a manual build produces `native32emu.dll` (or `libnative32emu.so` /
 
 ```bash
 # Basic usage
-cargo run -- path/to/game.smf
+cargo run -p native32emu -- path/to/game.smf
 
 # With options
-cargo run -- --scale 2 --volume 80 path/to/game.smf
+cargo run -p native32emu -- --scale 2 --volume 80 path/to/game.smf
 
 # Release build
-cargo run --release -- path/to/game.smf
+cargo run -p native32emu --release -- path/to/game.smf
 ```
 
 ### RetroArch Mode
 
 1. **Build the libretro core** (see Building section above)
 2. **Install the core**:
-   - Copy `dist/native32emu_libretro.dll` (or `.so`/`.dylib`) to RetroArch's `cores/` directory
-   - Copy `dist/native32emu_libretro.info` to RetroArch's `info/` directory
+   - Copy `target/release/native32emu_libretro.dll` (or `.so`/`.dylib`) to RetroArch's `cores/` directory
+   - Copy `crates/native32emu-libretro/native32emu_libretro.info` to RetroArch's `info/` directory
 3. **Load the core in RetroArch**:
    - Open RetroArch
    - Select "Load Core" → "Native32 (Native32Emu)"
@@ -132,37 +117,41 @@ cargo run -- --screenshot screenshot.png --screenshot-frames 30 native32_game/EA
 ## Architecture
 
 ```
-src/
-├── lib.rs                   # Library crate root (module declarations)
-├── main.rs                  # Standalone binary entry point (thin front-end)
-├── core/                    # Platform-independent emulator core (shared)
-│   ├── mod.rs
-│   ├── emulator.rs          # Shared Emulator + VmHost (standalone & libretro)
-│   ├── actions.rs           # Action opcode enum (36 opcodes)
-│   ├── action_vm.rs         # Stack-based virtual machine
-│   ├── audio_engine.rs      # MP3/PCM audio (rodio for standalone, buffer for libretro)
-│   ├── content_loader.rs    # SSL multi-file content switching
-│   ├── des_constants.rs     # DES permutation tables and S-boxes
-│   ├── error.rs             # Error types
-│   ├── file_loader.rs       # File I/O, header parsing, resource tables
-│   ├── frame_player.rs      # Main timeline frame playback (30fps)
-│   ├── header_decryptor.rs  # Custom DES ECB header decryption
-│   ├── image_decoder.rs     # YUV 4:2:0 and ARGB1555 image decoders
-│   ├── input_handler.rs     # Input to keycode mapping (keyboard / RetroPad)
-│   ├── renderer.rs          # Frame rendering with depth sorting
-│   ├── save_manager.rs      # Save data persistence (.ssl_sav)
-│   └── sprite_system.rs     # Movie/sprite instance management
-├── standalone/              # Standalone-only front-end
-│   ├── mod.rs
-│   ├── cli.rs               # Command-line argument parsing
-│   └── gamepad_overlay.rs   # On-screen virtual gamepad overlay
-└── libretro/                # libretro API implementation (feature = "libretro")
-    ├── mod.rs
-    ├── api.rs               # Exported libretro functions (retro_init, retro_run, etc.)
-    ├── callbacks.rs         # Callback management for video/audio/input
-    ├── constants.rs         # libretro constants
-    ├── logger.rs            # Bridges the `log` crate to the libretro log interface
-    └── types.rs             # libretro type definitions
+crates/
+├── native32emu-core/            # Platform-independent emulator engine (library)
+│   └── src/
+│       ├── lib.rs               # Crate root (module declarations)
+│       ├── emulator.rs          # Shared Emulator + VmHost (both front-ends)
+│       ├── actions.rs           # Action opcode enum (36 opcodes)
+│       ├── action_vm.rs         # Stack-based virtual machine
+│       ├── audio_engine.rs      # MP3/PCM audio (rodio for standalone, buffer for libretro)
+│       ├── content_loader.rs    # SSL multi-file content switching
+│       ├── des_constants.rs     # DES permutation tables and S-boxes
+│       ├── error.rs             # Error types
+│       ├── file_loader.rs       # File I/O, header parsing, resource tables
+│       ├── frame_player.rs      # Main timeline frame playback (30fps)
+│       ├── header_decryptor.rs  # Custom DES ECB header decryption
+│       ├── image_decoder.rs     # YUV 4:2:0 and ARGB1555 image decoders
+│       ├── input_handler.rs     # Input to keycode mapping (keyboard / RetroPad)
+│       ├── renderer.rs          # Frame rendering with depth sorting
+│       ├── save_manager.rs      # Save data persistence (.ssl_sav)
+│       └── sprite_system.rs     # Movie/sprite instance management
+├── native32emu/                 # Standalone binary (-> native32-emu)
+│   └── src/
+│       ├── main.rs              # Window loop and thin front-end
+│       └── standalone/
+│           ├── cli.rs           # Command-line argument parsing
+│           └── gamepad_overlay.rs  # On-screen virtual gamepad overlay
+└── native32emu-libretro/        # libretro cdylib (-> native32emu_libretro.{dll,so,dylib})
+    ├── native32emu_libretro.info   # RetroArch core metadata
+    └── src/
+        ├── lib.rs               # cdylib crate root
+        └── libretro/
+            ├── api.rs           # Exported libretro functions (retro_init, retro_run, etc.)
+            ├── callbacks.rs     # Callback management for video/audio/input
+            ├── constants.rs     # libretro constants
+            ├── logger.rs        # Bridges the `log` crate to the libretro log interface
+            └── types.rs         # libretro type definitions
 ```
 
 ## Dependencies

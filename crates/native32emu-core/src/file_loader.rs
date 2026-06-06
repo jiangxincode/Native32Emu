@@ -2,9 +2,9 @@
 
 use std::collections::HashMap;
 
-use crate::core::error::{EmuError, Result};
-use crate::core::header_decryptor::decrypt_header;
-use crate::core::image_decoder::{decode_image_argb, decode_image_yuv, RgbaImage};
+use crate::error::{EmuError, Result};
+use crate::header_decryptor::decrypt_header;
+use crate::image_decoder::{decode_image_argb, decode_image_yuv, RgbaImage};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ObjectType {
@@ -82,7 +82,7 @@ pub struct Native32Reader {
     pub mp3_offset: u32,
     pub sound_table: usize,
     // Caches
-    actions_cache: Vec<Option<(crate::core::actions::Action, Option<ActionPayload>)>>,
+    actions_cache: Vec<Option<(crate::actions::Action, Option<ActionPayload>)>>,
     images_cache: HashMap<u32, Option<RgbaImage>>,
     frames_cache: HashMap<u32, Vec<FrameObject>>,
     movies_cache: HashMap<u32, Vec<MovieFrame>>,
@@ -262,7 +262,7 @@ impl Native32Reader {
     fn disassemble_action(
         &self,
         index: u32,
-    ) -> Option<(crate::core::actions::Action, Option<ActionPayload>)> {
+    ) -> Option<(crate::actions::Action, Option<ActionPayload>)> {
         let ptr = self.base + self.action_idx as usize + ((index - 1) * 8) as usize;
         if ptr + 8 > self.data.len() {
             return None;
@@ -270,9 +270,9 @@ impl Native32Reader {
         let opcode = read_u32_le(&self.data, ptr);
         let payload_val = read_u32_le(&self.data, ptr + 4);
 
-        let act = crate::core::actions::Action::from_u32(opcode)?;
+        let act = crate::actions::Action::from_u32(opcode)?;
 
-        if payload_val == 0 || act == crate::core::actions::Action::End {
+        if payload_val == 0 || act == crate::actions::Action::End {
             return Some((act, None));
         }
 
@@ -282,10 +282,10 @@ impl Native32Reader {
         }
 
         match act {
-            crate::core::actions::Action::If
-            | crate::core::actions::Action::GotoFrame
-            | crate::core::actions::Action::GotoFrame2
-            | crate::core::actions::Action::Jump => {
+            crate::actions::Action::If
+            | crate::actions::Action::GotoFrame
+            | crate::actions::Action::GotoFrame2
+            | crate::actions::Action::Jump => {
                 if payload_idx + 2 <= self.data.len() {
                     let val = read_i16_le(&self.data, payload_idx);
                     Some((act, Some(ActionPayload::Integer(val))))
@@ -304,7 +304,7 @@ impl Native32Reader {
     pub fn get_action(
         &mut self,
         index: u32,
-    ) -> Option<(crate::core::actions::Action, Option<ActionPayload>)> {
+    ) -> Option<(crate::actions::Action, Option<ActionPayload>)> {
         while index as usize >= self.actions_cache.len() {
             let i = self.actions_cache.len() as u32;
             let action = self.disassemble_action(i);
@@ -317,7 +317,7 @@ impl Native32Reader {
     pub fn get_action_cached(
         &self,
         index: u32,
-    ) -> Option<&(crate::core::actions::Action, Option<ActionPayload>)> {
+    ) -> Option<&(crate::actions::Action, Option<ActionPayload>)> {
         if (index as usize) < self.actions_cache.len() {
             self.actions_cache[index as usize].as_ref()
         } else {

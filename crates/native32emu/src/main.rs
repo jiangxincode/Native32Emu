@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 
-use native32emu::core::emulator::Emulator;
+use native32emu_core::emulator::Emulator;
 
 use crate::standalone::cli::Cli;
 use crate::standalone::gamepad_overlay::GamepadOverlay;
