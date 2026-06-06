@@ -51,6 +51,7 @@ mod screen {
     type Display = *mut core::ffi::c_void;
     type Window = u64;
 
+    #[link(name = "X11")]
     extern "system" {
         fn XOpenDisplay(display_name: *const u8) -> Display;
         fn XCloseDisplay(display: Display) -> i32;
@@ -79,6 +80,7 @@ mod screen {
     // macOS Core Graphics FFI for querying main display resolution
     type CGDirectDisplayID = u32;
 
+    #[link(name = "CoreGraphics", kind = "framework")]
     extern "C" {
         fn CGMainDisplayID() -> CGDirectDisplayID;
         fn CGDisplayPixelsWide(display: CGDirectDisplayID) -> usize;
