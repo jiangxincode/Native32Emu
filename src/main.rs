@@ -4,17 +4,16 @@
 // argument parsing, keyboard input and the optional on-screen gamepad overlay.
 // It is only compiled when the "standalone" feature is enabled.
 
-mod cli;
-mod gamepad_overlay;
+mod standalone;
 
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 
-use native32emu::core_emulator::emulator::Emulator;
+use native32emu::core::emulator::Emulator;
 
-use crate::cli::Cli;
-use crate::gamepad_overlay::GamepadOverlay;
+use crate::standalone::cli::Cli;
+use crate::standalone::gamepad_overlay::GamepadOverlay;
 
 // Platform-specific screen resolution APIs for fullscreen mode
 

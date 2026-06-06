@@ -2,7 +2,7 @@
 // This is NOT a standard DES implementation - it uses the same algorithm
 // as the reference implementation to ensure compatibility.
 
-use crate::des_constants::*;
+use crate::core::des_constants::*;
 
 fn expand_bits(data: &[u8], count: usize) -> Vec<u8> {
     let mut result = vec![0u8; count];

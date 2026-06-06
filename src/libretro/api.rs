@@ -6,7 +6,7 @@
 use super::callbacks;
 use super::constants::*;
 use super::types::*;
-use crate::core_emulator::emulator::Emulator;
+use crate::core::emulator::Emulator;
 use std::ffi::{c_void, CStr};
 use std::ptr;
 

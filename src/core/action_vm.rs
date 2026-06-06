@@ -5,8 +5,8 @@ use std::collections::HashMap;
 
 use rand::RngExt;
 
-use crate::actions::Action;
-use crate::file_loader::{ActionPayload, Native32Reader};
+use crate::core::actions::Action;
+use crate::core::file_loader::{ActionPayload, Native32Reader};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]

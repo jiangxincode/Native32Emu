@@ -1,6 +1,6 @@
 // Audio engine: handles MP3 and raw PCM audio playback.
 
-use crate::file_loader::{AudioFormat, Colorspace, Native32Reader};
+use crate::core::file_loader::{AudioFormat, Colorspace, Native32Reader};
 
 #[cfg(feature = "standalone")]
 use rodio::Source;

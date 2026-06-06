@@ -1,14 +1,14 @@
 // Core emulator implementation for libretro.
 
-use crate::action_vm::{ActionProp, ActionVM, VmHost};
-use crate::audio_engine::AudioEngine;
-use crate::content_loader::ContentLoader;
-use crate::file_loader::{FrameObject, Native32Reader, ObjectType};
-use crate::frame_player::FramePlayer;
-use crate::input_handler::InputHandler;
-use crate::renderer::Renderer;
-use crate::save_manager::SaveManager;
-use crate::sprite_system::{MovieState, SpriteSystem};
+use crate::core::action_vm::{ActionProp, ActionVM, VmHost};
+use crate::core::audio_engine::AudioEngine;
+use crate::core::content_loader::ContentLoader;
+use crate::core::file_loader::{FrameObject, Native32Reader, ObjectType};
+use crate::core::frame_player::FramePlayer;
+use crate::core::input_handler::InputHandler;
+use crate::core::renderer::Renderer;
+use crate::core::save_manager::SaveManager;
+use crate::core::sprite_system::{MovieState, SpriteSystem};
 use anyhow::{Context, Result};
 use std::path::PathBuf;
 
@@ -74,8 +74,8 @@ impl Emulator {
     /// Get the audio sample rate based on colorspace.
     pub fn get_audio_sample_rate(&self) -> f64 {
         match self.reader.colorspace {
-            crate::file_loader::Colorspace::YUV => 11025.0,
-            crate::file_loader::Colorspace::ARGB => 22050.0,
+            crate::core::file_loader::Colorspace::YUV => 11025.0,
+            crate::core::file_loader::Colorspace::ARGB => 22050.0,
         }
     }
 
