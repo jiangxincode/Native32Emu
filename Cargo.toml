@@ -6,7 +6,7 @@ description = "A Native32 game emulator written in Rust"
 
 [lib]
 name = "native32emu"
-crate-type = ["cdylib", "lib"]
+crate-type = ["lib"]
 path = "src/lib.rs"
 
 [[bin]]
