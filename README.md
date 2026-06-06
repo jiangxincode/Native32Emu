@@ -37,18 +37,6 @@ cargo build --release
 
 ### Libretro Core (for RetroArch)
 
-**Windows:**
-```cmd
-build-libretro.bat
-```
-
-**Linux/macOS:**
-```bash
-chmod +x build-libretro.sh
-./build-libretro.sh
-```
-
-Or directly with cargo:
 ```bash
 cargo rustc --lib --release --features libretro --no-default-features --crate-type cdylib
 ```
