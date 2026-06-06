@@ -25,6 +25,76 @@ mod sprite_system;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
+// Platform-specific screen resolution APIs for fullscreen mode
+
+#[cfg(target_os = "windows")]
+mod screen {
+    extern "system" {
+        fn GetSystemMetrics(nIndex: i32) -> i32;
+    }
+    const SM_CXSCREEN: i32 = 0;
+    const SM_CYSCREEN: i32 = 1;
+
+    pub fn get_screen_size() -> (usize, usize) {
+        unsafe {
+            (
+                GetSystemMetrics(SM_CXSCREEN) as usize,
+                GetSystemMetrics(SM_CYSCREEN) as usize,
+            )
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod screen {
+    // X11 FFI for querying display resolution
+    type Display = *mut core::ffi::c_void;
+    type Window = u64;
+
+    #[link(name = "X11")]
+    extern "system" {
+        fn XOpenDisplay(display_name: *const u8) -> Display;
+        fn XCloseDisplay(display: Display) -> i32;
+        fn XDefaultRootWindow(display: Display) -> Window;
+        fn XDisplayWidth(display: Display, screen_number: i32) -> i32;
+        fn XDisplayHeight(display: Display, screen_number: i32) -> i32;
+    }
+
+    pub fn get_screen_size() -> (usize, usize) {
+        unsafe {
+            let display = XOpenDisplay(std::ptr::null());
+            if display.is_null() {
+                return (800, 600);
+            }
+            let w = XDisplayWidth(display, 0) as usize;
+            let h = XDisplayHeight(display, 0) as usize;
+            let _ = XDefaultRootWindow(display);
+            let _ = XCloseDisplay(display);
+            (w, h)
+        }
+    }
+}
+
+#[cfg(target_os = "macos")]
+mod screen {
+    // macOS Core Graphics FFI for querying main display resolution
+    type CGDirectDisplayID = u32;
+
+    #[link(name = "CoreGraphics", kind = "framework")]
+    extern "C" {
+        fn CGMainDisplayID() -> CGDirectDisplayID;
+        fn CGDisplayPixelsWide(display: CGDirectDisplayID) -> usize;
+        fn CGDisplayPixelsHigh(display: CGDirectDisplayID) -> usize;
+    }
+
+    pub fn get_screen_size() -> (usize, usize) {
+        unsafe {
+            let display = CGMainDisplayID();
+            (CGDisplayPixelsWide(display), CGDisplayPixelsHigh(display))
+        }
+    }
+}
+
 use anyhow::{Context, Result};
 use file_loader::{FrameObject, Native32Reader, ObjectType};
 use sprite_system::{MovieState, SpriteSystem};
@@ -75,9 +145,6 @@ impl Emulator {
         let resolution = reader.resolution;
         let colorspace = reader.colorspace;
 
-        let display_width = resolution.0 * scale;
-        let display_height = resolution.1 * scale;
-
         let mut input = InputHandler::new();
         input.remap(key_remappings);
 
@@ -90,7 +157,7 @@ impl Emulator {
             frame_player: FramePlayer::new(),
             vm: ActionVM::new(),
             audio: AudioEngine::new(colorspace, volume),
-            renderer: Renderer::new(display_width, display_height),
+            renderer: Renderer::new(resolution.0, resolution.1),
             input,
             save_manager,
             content_loader: ContentLoader::new(),
@@ -319,9 +386,13 @@ impl Emulator {
             .into_iter()
             .collect();
         let resolution = self.reader.resolution;
-        let w = resolution.0 * self.scale;
-        let h = resolution.1 * self.scale;
-        GamepadOverlay::draw(&mut self.renderer.buffer, w, h, self.scale, &pressed);
+        GamepadOverlay::draw(
+            &mut self.renderer.buffer,
+            resolution.0,
+            resolution.1,
+            self.scale,
+            &pressed,
+        );
     }
 
     /// Switch to new content (SSL multi-file).
@@ -653,21 +724,38 @@ fn main() -> Result<()> {
     let resolution = emu.reader.resolution;
     let display_width = resolution.0 * cli.scale;
     let display_height = resolution.1 * cli.scale;
+    let (buf_width, buf_height) = (resolution.0, resolution.1);
+
+    // For fullscreen, get screen resolution before creating the window
+    // so minifb creates the window at the correct size from the start.
+    let (window_width, window_height) = if cli.fullscreen {
+        let (sw, sh) = screen::get_screen_size();
+        (sw, sh)
+    } else {
+        (display_width as usize, display_height as usize)
+    };
 
     // Create window
     let window_opts = minifb::WindowOptions {
-        resize: true,
+        resize: !cli.fullscreen,
+        borderless: cli.fullscreen,
         scale_mode: minifb::ScaleMode::AspectRatioStretch,
         ..Default::default()
     };
 
     let mut window = minifb::Window::new(
         "Native32 Emulator",
-        display_width as usize,
-        display_height as usize,
+        window_width,
+        window_height,
         window_opts,
     )
     .context("Failed to create window")?;
+
+    // Apply fullscreen settings
+    if cli.fullscreen {
+        window.topmost(true);
+        window.set_position(0, 0);
+    }
 
     // Limit to 30fps
     window.set_target_fps(30);
@@ -697,8 +785,8 @@ fn main() -> Result<()> {
         window
             .update_with_buffer(
                 &emu.renderer.buffer,
-                display_width as usize,
-                display_height as usize,
+                buf_width as usize,
+                buf_height as usize,
             )
             .context("Failed to update display")?;
 
