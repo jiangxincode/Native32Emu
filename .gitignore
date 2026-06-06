@@ -2,7 +2,6 @@ native32_game/
 third_party/
 .kiro/
 target/
-dist/
 .codegraph/
 smoke_results/
 .claude/

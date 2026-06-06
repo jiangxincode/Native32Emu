@@ -70,14 +70,11 @@ jobs:
           sudo apt-get install -y libasound2-dev libx11-dev libxkbcommon-dev
         timeout-minutes: 10
 
-      - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Build standalone
+        run: cargo build -p native32emu --release --target ${{ matrix.target }}
 
       - name: Build libretro core
-        shell: bash
-        run: |
-          cargo rustc --lib --release --target ${{ matrix.target }} \
-            --features libretro --no-default-features --crate-type cdylib
+        run: cargo build -p native32emu-libretro --release --target ${{ matrix.target }}
 
       - name: Stage libretro core
         shell: bash
@@ -85,14 +82,14 @@ jobs:
           out="libretro/${{ matrix.artifact }}"
           mkdir -p "$out"
           rel="target/${{ matrix.target }}/release"
-          for f in "native32emu.dll" "libnative32emu.so" "libnative32emu.dylib"; do
+          # The cdylib is already named native32emu_libretro.<ext> by Cargo.
+          for f in "native32emu_libretro.dll" "libnative32emu_libretro.so" "libnative32emu_libretro.dylib"; do
             if [ -f "$rel/$f" ]; then
-              ext="${f##*.}"
-              cp "$rel/$f" "$out/native32emu_libretro.$ext"
+              cp "$rel/$f" "$out/"
               break
             fi
           done
-          cp native32emu_libretro.info "$out/native32emu_libretro.info"
+          cp crates/native32emu-libretro/native32emu_libretro.info "$out/native32emu_libretro.info"
           ls -la "$out"
 
       - name: Package libretro (Unix)

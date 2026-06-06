@@ -1,0 +1,29 @@
+[package]
+name = "native32emu-core"
+version.workspace = true
+edition.workspace = true
+description = "Platform-independent Native32 emulator engine"
+license.workspace = true
+
+[lib]
+name = "native32emu_core"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+log.workspace = true
+rand.workspace = true
+image.workspace = true
+
+# Only needed by the standalone front-end's audio/input code paths.
+minifb = { workspace = true, optional = true }
+rodio = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile = "3"
+cargo-husky = { version = "1", default-features = false, features = ["precommit-hook", "run-cargo-fmt", "run-cargo-clippy"] }
+
+[features]
+# Enables the minifb/rodio-backed code paths used by the standalone binary.
+standalone = ["dep:minifb", "dep:rodio"]

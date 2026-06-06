@@ -1150,13 +1150,24 @@ dependencies = [
 ]
 
 [[package]]
-name = "native32-emu"
+name = "native32emu"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "env_logger",
+ "log",
+ "minifb",
+ "native32emu-core",
+ "rodio",
+]
+
+[[package]]
+name = "native32emu-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "cargo-husky",
- "clap",
- "env_logger",
  "image",
  "log",
  "minifb",
@@ -1164,6 +1175,14 @@ dependencies = [
  "rodio",
  "tempfile",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "native32emu-libretro"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "native32emu-core",
 ]
 
 [[package]]

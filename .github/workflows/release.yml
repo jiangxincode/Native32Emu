@@ -50,8 +50,27 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libasound2-dev libx11-dev libxkbcommon-dev
 
-      - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+      - name: Build standalone
+        run: cargo build -p native32emu --release --target ${{ matrix.target }}
+
+      - name: Build libretro core
+        run: cargo build -p native32emu-libretro --release --target ${{ matrix.target }}
+
+      - name: Stage libretro core
+        shell: bash
+        run: |
+          out="libretro/${{ matrix.artifact }}"
+          mkdir -p "$out"
+          rel="target/${{ matrix.target }}/release"
+          # The cdylib is already named native32emu_libretro.<ext> by Cargo.
+          for f in "native32emu_libretro.dll" "libnative32emu_libretro.so" "libnative32emu_libretro.dylib"; do
+            if [ -f "$rel/$f" ]; then
+              cp "$rel/$f" "$out/"
+              break
+            fi
+          done
+          cp crates/native32emu-libretro/native32emu_libretro.info "$out/native32emu_libretro.info"
+          ls -la "$out"
 
       - name: Package (Unix)
         if: runner.os != 'Windows'
@@ -67,11 +86,29 @@ jobs:
           7z a ../../../${{ matrix.artifact }}.zip native32-emu.exe
           cd ../../..
 
+      - name: Package libretro (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cd libretro
+          tar czf ../${{ matrix.artifact }}-libretro.tar.gz ${{ matrix.artifact }}
+          cd ..
+
+      - name: Package libretro (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cd libretro
+          7z a ../${{ matrix.artifact }}-libretro.zip ${{ matrix.artifact }}
+          cd ..
+
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}.*
+          path: |
+            ${{ matrix.artifact }}.*
+            ${{ matrix.artifact }}-libretro.*
 
   release:
     name: Create Release
@@ -94,11 +131,16 @@ jobs:
             Native32 Emulator ${{ github.ref_name }}
 
             ## Downloads
+
+            ### Standalone emulator
             - **Linux x86_64**: `native32-emu-linux-x86_64.tar.gz`
-            - **Linux aarch64**: `native32-emu-linux-aarch64.tar.gz`
             - **macOS x86_64**: `native32-emu-macos-x86_64.tar.gz`
             - **macOS aarch64**: `native32-emu-macos-aarch64.tar.gz`
             - **Windows x86_64**: `native32-emu-windows-x86_64.zip`
+
+            ### libretro core (for RetroArch)
+            - Files ending in `-libretro.*` contain `native32emu_libretro.<ext>`
+              plus `native32emu_libretro.info`, ready to drop into RetroArch.
           files: artifacts/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

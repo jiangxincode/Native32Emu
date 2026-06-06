@@ -56,12 +56,12 @@ impl SpriteSystem {
     /// Update movie instances for a newly loaded frame.
     /// - Add new named movies that appear in the frame
     /// - Remove non-cloned movies that are no longer in the frame
-    pub fn update_for_frame(&mut self, frame_objects: &[crate::core::file_loader::FrameObject]) {
+    pub fn update_for_frame(&mut self, frame_objects: &[crate::file_loader::FrameObject]) {
         let mut frame_movie_names: std::collections::HashSet<String> =
             std::collections::HashSet::new();
 
         for obj in frame_objects {
-            if obj.obj_type == crate::core::file_loader::ObjectType::Movie {
+            if obj.obj_type == crate::file_loader::ObjectType::Movie {
                 if let Some(ref name) = obj.name {
                     frame_movie_names.insert(name.clone());
                     if !self.sprites.contains_key(name) {
@@ -136,7 +136,7 @@ impl SpriteSystem {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::core::file_loader::{FrameObject, ObjectType};
+    use crate::file_loader::{FrameObject, ObjectType};
 
     fn make_movie_object(name: &str, index: u16, x: i16, y: i16, depth: u16) -> FrameObject {
         FrameObject {

@@ -28,7 +28,7 @@ jobs:
         uses: swatinem/rust-cache@v2
 
       - name: Build
-        run: cargo build
+        run: cargo build --workspace
 
       - name: Run tests with coverage
         run: |

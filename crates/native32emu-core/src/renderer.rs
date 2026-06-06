@@ -2,9 +2,9 @@
 
 use std::path::Path;
 
-use crate::core::file_loader::{FrameObject, Native32Reader, ObjectType};
-use crate::core::image_decoder::RgbaImage;
-use crate::core::sprite_system::SpriteSystem;
+use crate::file_loader::{FrameObject, Native32Reader, ObjectType};
+use crate::image_decoder::RgbaImage;
+use crate::sprite_system::SpriteSystem;
 
 pub struct DrawEntry {
     pub image_index: u32,
