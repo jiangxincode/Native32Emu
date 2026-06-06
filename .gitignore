@@ -3,5 +3,4 @@ third_party/
 .kiro/
 target/
 .codegraph/
-smoke_results/
 .claude/

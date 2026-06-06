@@ -114,6 +114,24 @@ cargo run -- --fullscreen native32_game/EACT/EBBLADE.smf
 cargo run -- --screenshot screenshot.png --screenshot-frames 30 native32_game/EACT/EBBLADE.smf
 ```
 
+## Testing
+
+Run the unit tests:
+
+```bash
+cargo test --workspace
+```
+
+There is also a smoke test that loads every available game, runs it for a number
+of frames, and checks that the emulator neither panics nor produces a blank
+frame. It needs the (non-distributed) game assets, so it is `#[ignore]`d by
+default and run on demand:
+
+```bash
+# Uses <repo>/native32_game by default, or set NATIVE32_GAME_DIR
+cargo test -p native32emu-core --test smoke -- --ignored --nocapture
+```
+
 ## Architecture
 
 ```
