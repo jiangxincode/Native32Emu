@@ -263,3 +263,263 @@ fn argb1555_to_argb(value: u16) -> u32 {
 fn read_u16_le(data: &[u8], offset: usize) -> u16 {
     u16::from_le_bytes([data[offset], data[offset + 1]])
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // === clip() tests ===
+
+    #[test]
+    fn test_clip_normal_values() {
+        assert_eq!(clip(0), 0);
+        assert_eq!(clip(128), 128);
+        assert_eq!(clip(255), 255);
+    }
+
+    #[test]
+    fn test_clip_clamps_low() {
+        assert_eq!(clip(-1), 0);
+        assert_eq!(clip(-1000), 0);
+    }
+
+    #[test]
+    fn test_clip_clamps_high() {
+        assert_eq!(clip(256), 255);
+        assert_eq!(clip(1000), 255);
+    }
+
+    // === argb1555_to_argb() tests ===
+
+    #[test]
+    fn test_argb1555_transparent() {
+        // bit 15 = 0 → transparent
+        assert_eq!(argb1555_to_argb(0x0000), 0x00000000);
+        assert_eq!(argb1555_to_argb(0x7FFF), 0x00000000); // bit 15 still 0
+    }
+
+    #[test]
+    fn test_argb1555_white() {
+        // bit 15 = 1, R=31, G=31, B=31
+        // 5-bit max 31 → shifted left by 3 → 248 (0xF8), not 255
+        assert_eq!(argb1555_to_argb(0xFFFF), 0xFFF8F8F8);
+    }
+
+    #[test]
+    fn test_argb1555_red() {
+        // bit 15 = 1, R=31, G=0, B=0
+        // value = 0x8000 | 31 = 0x801F
+        let result = argb1555_to_argb(0x801F);
+        assert_eq!(result & 0xFF000000, 0xFF000000); // alpha = 0xFF
+        assert_eq!((result >> 16) & 0xFF, 0xF8); // R = 31 << 3 = 248
+        assert_eq!((result >> 8) & 0xFF, 0x00); // G = 0
+        assert_eq!(result & 0xFF, 0x00); // B = 0
+    }
+
+    #[test]
+    fn test_argb1555_green() {
+        // bit 15 = 1, R=0, G=31, B=0
+        // value = 0x8000 | (31 << 5) = 0x83E0
+        let result = argb1555_to_argb(0x83E0);
+        assert_eq!((result >> 16) & 0xFF, 0x00); // R = 0
+        assert_eq!((result >> 8) & 0xFF, 0xF8); // G = 31 << 3 = 248
+        assert_eq!(result & 0xFF, 0x00); // B = 0
+    }
+
+    #[test]
+    fn test_argb1555_blue() {
+        // bit 15 = 1, R=0, G=0, B=31
+        // value = 0x8000 | (31 << 10) = 0x8000 | 0x7C00 = 0xFC00
+        let result = argb1555_to_argb(0xFC00);
+        assert_eq!((result >> 16) & 0xFF, 0x00); // R = 0
+        assert_eq!((result >> 8) & 0xFF, 0x00); // G = 0
+        assert_eq!(result & 0xFF, 0xF8); // B = 31 << 3 = 248
+    }
+
+    // === RgbaImage tests ===
+
+    #[test]
+    fn test_rgba_image_clone() {
+        let img = RgbaImage {
+            width: 2,
+            height: 1,
+            pixels: vec![0xFF000000, 0x00FF0000],
+        };
+        let img2 = img.clone();
+        assert_eq!(img2.width, 2);
+        assert_eq!(img2.pixels, vec![0xFF000000, 0x00FF0000]);
+    }
+
+    // === decode_image_yuv tests ===
+
+    #[test]
+    fn test_decode_yuv_empty_data() {
+        assert!(decode_image_yuv(&[]).is_none());
+    }
+
+    #[test]
+    fn test_decode_yuv_too_short() {
+        // Less than 8 bytes header
+        assert!(decode_image_yuv(&[0u8; 7]).is_none());
+    }
+
+    #[test]
+    fn test_decode_yuv_zero_dimensions() {
+        let mut data = vec![0u8; 16];
+        // width = 0
+        data[0..2].copy_from_slice(&0u16.to_le_bytes());
+        data[2..4].copy_from_slice(&240u16.to_le_bytes());
+        assert!(decode_image_yuv(&data).is_none());
+    }
+
+    #[test]
+    fn test_decode_yuv_minimal_image() {
+        // 2x2 YUV image (minimum valid: uv_w=1, uv_h=1)
+        let mut data = vec![0u8; 64];
+        data[0..2].copy_from_slice(&2u16.to_le_bytes()); // width=2
+        data[2..4].copy_from_slice(&2u16.to_le_bytes()); // height=2
+                                                         // img_size = enough for 1 pixel quad (6 bytes) + header offset
+        data[4..8].copy_from_slice(&12u32.to_le_bytes());
+
+        // Command: literal 1 quad (0x8000 | 1 = 0x8001)
+        data[8..10].copy_from_slice(&0x8001u16.to_le_bytes());
+        // 6 bytes of YUV data: Y0, Y1, Y2, Y3, V, U
+        data[10] = 128; // Y0
+        data[11] = 128; // Y1
+        data[12] = 128; // Y2
+        data[13] = 128; // Y3
+        data[14] = 128; // V
+        data[15] = 128; // U
+
+        let result = decode_image_yuv(&data);
+        assert!(result.is_some());
+        let img = result.unwrap();
+        assert_eq!(img.width, 2);
+        assert_eq!(img.height, 2);
+        assert_eq!(img.pixels.len(), 4);
+    }
+
+    // === decode_image_argb tests ===
+
+    #[test]
+    fn test_decode_argb_empty_data() {
+        assert!(decode_image_argb(&[]).is_none());
+    }
+
+    #[test]
+    fn test_decode_argb_too_short() {
+        assert!(decode_image_argb(&[0u8; 7]).is_none());
+    }
+
+    #[test]
+    fn test_decode_argb_zero_dimensions() {
+        let mut data = vec![0u8; 16];
+        data[0..2].copy_from_slice(&0u16.to_le_bytes()); // width=0
+        data[2..4].copy_from_slice(&2u16.to_le_bytes()); // height=2
+        assert!(decode_image_argb(&data).is_none());
+    }
+
+    #[test]
+    fn test_decode_argb_transparent_pixel() {
+        let mut data = vec![0u8; 32];
+        data[0..2].copy_from_slice(&1u16.to_le_bytes()); // width=1
+        data[2..4].copy_from_slice(&1u16.to_le_bytes()); // height=1
+        data[4..8].copy_from_slice(&2u32.to_le_bytes()); // img_size=2 (1 command)
+
+        // Command: 0x0000 = literal transparent pixel
+        data[8..10].copy_from_slice(&0x0000u16.to_le_bytes());
+
+        let result = decode_image_argb(&data);
+        assert!(result.is_some());
+        let img = result.unwrap();
+        assert_eq!(img.pixels[0], 0x00000000); // transparent
+    }
+
+    #[test]
+    fn test_decode_argb_repeated_pixel() {
+        let mut data = vec![0u8; 32];
+        data[0..2].copy_from_slice(&3u16.to_le_bytes()); // width=3
+        data[2..4].copy_from_slice(&1u16.to_le_bytes()); // height=1
+        data[4..8].copy_from_slice(&4u32.to_le_bytes()); // img_size=4 (1 command + 1 pixel)
+
+        // Command: 0xC000 | 3 = repeat 3 times
+        data[8..10].copy_from_slice(&(0xC000u16 | 3).to_le_bytes());
+        // ARGB1555 value: white (0xFFFF) → ARGB8888 = 0xFFF8F8F8 (5-bit max 31→248)
+        data[10..12].copy_from_slice(&0xFFFFu16.to_le_bytes());
+
+        let result = decode_image_argb(&data);
+        assert!(result.is_some());
+        let img = result.unwrap();
+        assert_eq!(img.pixels.len(), 3);
+        for pixel in &img.pixels {
+            assert_eq!(*pixel, 0xFFF8F8F8); // white: 5-bit 31<<3=248 per channel
+        }
+    }
+
+    #[test]
+    fn test_decode_argb_unknown_command_returns_none() {
+        let mut data = vec![0u8; 32];
+        data[0..2].copy_from_slice(&1u16.to_le_bytes()); // width=1
+        data[2..4].copy_from_slice(&1u16.to_le_bytes()); // height=1
+        data[4..8].copy_from_slice(&2u32.to_le_bytes()); // img_size=2
+
+        // Unknown command: 0x4000 (not 0x0000 and not 0xC000 prefix)
+        data[8..10].copy_from_slice(&0x4000u16.to_le_bytes());
+
+        let result = decode_image_argb(&data);
+        assert!(result.is_none());
+    }
+
+    // === interpolate_y tests ===
+
+    #[test]
+    fn test_interpolate_y_identity_for_uniform() {
+        // Uniform non-zero data should pass through
+        let data = vec![128u8; 4]; // 2x2
+        let result = interpolate_y(&data, 2, 2);
+        assert_eq!(result.len(), 8); // 2x4
+                                     // All values should be 128
+        for v in &result {
+            assert_eq!(*v, 128);
+        }
+    }
+
+    #[test]
+    fn test_interpolate_y_doubles_height() {
+        let data = vec![10u8; 6]; // 3x2
+        let result = interpolate_y(&data, 3, 2);
+        assert_eq!(result.len(), 12); // 3x4
+    }
+
+    // === interpolate_x tests ===
+
+    #[test]
+    fn test_interpolate_x_identity_for_uniform() {
+        let data = vec![128u8; 4]; // 2x2
+        let result = interpolate_x(&data, 2, 2);
+        assert_eq!(result.len(), 8); // 4x2
+        for v in &result {
+            assert_eq!(*v, 128);
+        }
+    }
+
+    #[test]
+    fn test_interpolate_x_doubles_width() {
+        let data = vec![10u8; 6]; // 3x2
+        let result = interpolate_x(&data, 3, 2);
+        assert_eq!(result.len(), 12); // 6x2
+    }
+
+    // === read_u16_le_slice tests ===
+
+    #[test]
+    fn test_read_u16_le_slice() {
+        assert_eq!(read_u16_le_slice(&[0x34, 0x12], 0), 0x1234);
+        assert_eq!(read_u16_le_slice(&[0x00, 0x34, 0x12, 0x00], 1), 0x1234);
+    }
+
+    #[test]
+    fn test_read_u32_le_slice() {
+        assert_eq!(read_u32_le_slice(&[0x78, 0x56, 0x34, 0x12], 0), 0x12345678);
+    }
+}

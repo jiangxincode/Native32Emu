@@ -82,3 +82,64 @@ impl InputHandler {
         self.pressed_buttons.iter().copied().collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_handler_has_no_pressed_buttons() {
+        let handler = InputHandler::new();
+        assert!(handler.get_pressed_buttons().is_empty());
+    }
+
+    #[test]
+    fn test_default_trait() {
+        let handler = InputHandler::default();
+        assert!(handler.get_pressed_buttons().is_empty());
+    }
+
+    #[test]
+    fn test_set_buttons_stores_keycodes() {
+        let mut handler = InputHandler::new();
+        handler.set_buttons(&[0x0200, 0x1c00]); // Left, Up
+        let pressed = handler.get_pressed_buttons();
+        assert_eq!(pressed.len(), 2);
+        assert!(pressed.contains(&0x0200));
+        assert!(pressed.contains(&0x1c00));
+    }
+
+    #[test]
+    fn test_set_buttons_clears_previous() {
+        let mut handler = InputHandler::new();
+        handler.set_buttons(&[0x0200]);
+        handler.set_buttons(&[0x0400]); // replace with Right only
+        let pressed = handler.get_pressed_buttons();
+        assert_eq!(pressed.len(), 1);
+        assert!(pressed.contains(&0x0400));
+        assert!(!pressed.contains(&0x0200));
+    }
+
+    #[test]
+    fn test_set_buttons_empty_clears_all() {
+        let mut handler = InputHandler::new();
+        handler.set_buttons(&[0x0200, 0x0400]);
+        handler.set_buttons(&[]);
+        assert!(handler.get_pressed_buttons().is_empty());
+    }
+
+    #[test]
+    fn test_set_buttons_deduplicates() {
+        let mut handler = InputHandler::new();
+        handler.set_buttons(&[0x0200, 0x0200, 0x0200]);
+        let pressed = handler.get_pressed_buttons();
+        assert_eq!(pressed.len(), 1);
+    }
+
+    #[test]
+    fn test_set_buttons_with_all_directions() {
+        let mut handler = InputHandler::new();
+        handler.set_buttons(&[0x0200, 0x0400, 0x1c00, 0x1e00, 0x4000, 0x8800]);
+        assert_eq!(handler.get_pressed_buttons().len(), 6);
+    }
+}

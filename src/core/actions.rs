@@ -115,3 +115,97 @@ impl Action {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_known_opcodes_roundtrip() {
+        // Every defined opcode should map to Some
+        let cases: &[(u32, Action)] = &[
+            (0x00, Action::End),
+            (0x04, Action::NextFrame),
+            (0x05, Action::PreviousFrame),
+            (0x06, Action::Play),
+            (0x07, Action::Stop),
+            (0x09, Action::StopSounds),
+            (0x0a, Action::Add),
+            (0x0b, Action::Subtract),
+            (0x0c, Action::Multiply),
+            (0x0d, Action::Divide),
+            (0x0e, Action::Equals),
+            (0x0f, Action::Less),
+            (0x10, Action::And),
+            (0x11, Action::Or),
+            (0x12, Action::Not),
+            (0x13, Action::StringEquals),
+            (0x14, Action::StringLength),
+            (0x15, Action::StringExtract),
+            (0x17, Action::Pop),
+            (0x18, Action::ToInteger),
+            (0x1c, Action::GetVariable),
+            (0x1d, Action::SetVariable),
+            (0x20, Action::SetTarget2),
+            (0x21, Action::StringAdd),
+            (0x22, Action::GetProperty),
+            (0x23, Action::SetProperty),
+            (0x24, Action::CloneSprite),
+            (0x25, Action::RemoveSprite),
+            (0x26, Action::Trace),
+            (0x27, Action::StartDrag),
+            (0x28, Action::EndDrag),
+            (0x29, Action::StringLess),
+            (0x30, Action::RandomNumber),
+            (0x31, Action::MBStringLength),
+            (0x32, Action::CharToAscii),
+            (0x33, Action::AsciiToChar),
+            (0x34, Action::GetTime),
+            (0x35, Action::MBStringExtract),
+            (0x36, Action::MBCharToAscii),
+            (0x37, Action::MBAsciiToChar),
+            (0x81, Action::GotoFrame),
+            (0x8a, Action::WaitForFrame),
+            (0x8b, Action::SetTarget),
+            (0x8c, Action::GotoLabel),
+            (0x8d, Action::WaitForFrame2),
+            (0x96, Action::Push),
+            (0x99, Action::Jump),
+            (0x9a, Action::GetUrl2),
+            (0x9d, Action::If),
+            (0x9e, Action::Call),
+            (0x9f, Action::GotoFrame2),
+        ];
+        for &(val, expected) in cases {
+            assert_eq!(
+                Action::from_u32(val),
+                Some(expected),
+                "opcode 0x{:02x}",
+                val
+            );
+        }
+    }
+
+    #[test]
+    fn test_unknown_opcodes_return_none() {
+        for val in [
+            0x01, 0x02, 0x03, 0x08, 0x16, 0x19, 0x1a, 0x1b, 0x1e, 0x1f, 0x2a, 0x80, 0xff,
+        ] {
+            assert_eq!(
+                Action::from_u32(val),
+                None,
+                "expected None for 0x{:02x}",
+                val
+            );
+        }
+    }
+
+    #[test]
+    fn test_opcode_values_match_repr() {
+        // Verify the discriminant values match what from_u32 expects
+        assert_eq!(Action::End as u32, 0x00);
+        assert_eq!(Action::Push as u32, 0x96);
+        assert_eq!(Action::Add as u32, 0x0a);
+        assert_eq!(Action::If as u32, 0x9d);
+    }
+}

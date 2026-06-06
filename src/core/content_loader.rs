@@ -106,3 +106,168 @@ impl ContentLoader {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_new_loader_has_no_pending() {
+        let mut loader = ContentLoader::new();
+        assert!(!loader.has_pending());
+        assert!(loader.take_pending().is_none());
+    }
+
+    #[test]
+    fn test_default_trait() {
+        let loader = ContentLoader::default();
+        assert!(!loader.has_pending());
+    }
+
+    #[test]
+    fn test_queue_load_simple_filename() {
+        let mut loader = ContentLoader::new();
+        loader.queue_load("level1.ssl");
+        assert!(loader.has_pending());
+        assert_eq!(loader.take_pending(), Some("level1.ssl".to_string()));
+    }
+
+    #[test]
+    fn test_queue_load_trims_trailing_spaces() {
+        let mut loader = ContentLoader::new();
+        loader.queue_load("BBLADE  /level1.ssl");
+        assert_eq!(loader.take_pending(), Some("BBLADE/level1.ssl".to_string()));
+    }
+
+    #[test]
+    fn test_queue_load_trims_leading_spaces() {
+        let mut loader = ContentLoader::new();
+        loader.queue_load("  BBLADE/level1.ssl");
+        assert_eq!(loader.take_pending(), Some("BBLADE/level1.ssl".to_string()));
+    }
+
+    #[test]
+    fn test_queue_load_removes_empty_segments() {
+        let mut loader = ContentLoader::new();
+        loader.queue_load("///BBLADE///level1.ssl///");
+        assert_eq!(loader.take_pending(), Some("BBLADE/level1.ssl".to_string()));
+    }
+
+    #[test]
+    fn test_queue_load_empty_string() {
+        let mut loader = ContentLoader::new();
+        loader.queue_load("");
+        assert!(!loader.has_pending(), "empty filename should not be queued");
+    }
+
+    #[test]
+    fn test_queue_load_only_spaces() {
+        let mut loader = ContentLoader::new();
+        loader.queue_load("   /   /   ");
+        assert!(
+            !loader.has_pending(),
+            "all-whitespace path should not be queued"
+        );
+    }
+
+    #[test]
+    fn test_queue_load_only_slashes() {
+        let mut loader = ContentLoader::new();
+        loader.queue_load("///");
+        assert!(!loader.has_pending(), "all-slash path should not be queued");
+    }
+
+    #[test]
+    fn test_queue_load_complex_path() {
+        let mut loader = ContentLoader::new();
+        loader.queue_load("  Game Dir  /  Sub Dir  /  file.ssl  ");
+        assert_eq!(
+            loader.take_pending(),
+            Some("Game Dir/Sub Dir/file.ssl".to_string())
+        );
+    }
+
+    #[test]
+    fn test_take_pending_consumes() {
+        let mut loader = ContentLoader::new();
+        loader.queue_load("test.ssl");
+        assert!(loader.take_pending().is_some());
+        assert!(!loader.has_pending());
+        assert!(loader.take_pending().is_none());
+    }
+
+    #[test]
+    fn test_queue_load_overwrites_previous() {
+        let mut loader = ContentLoader::new();
+        loader.queue_load("first.ssl");
+        loader.queue_load("second.ssl");
+        assert_eq!(loader.take_pending(), Some("second.ssl".to_string()));
+    }
+
+    #[test]
+    fn test_find_content_file_nonexistent() {
+        let result = ContentLoader::find_content_file(
+            std::path::Path::new("/nonexistent/game.ssl"),
+            "missing.ssl",
+        );
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_find_content_file_finds_sibling() {
+        let dir = tempfile::tempdir().unwrap();
+        let game_path = dir.path().join("game.ssl");
+        let target = dir.path().join("level2.ssl");
+        std::fs::write(&game_path, b"fake").unwrap();
+        std::fs::write(&target, b"fake").unwrap();
+
+        let result = ContentLoader::find_content_file(&game_path, "level2.ssl");
+        assert_eq!(result, Some(target));
+    }
+
+    #[test]
+    fn test_find_content_file_case_insensitive() {
+        let dir = tempfile::tempdir().unwrap();
+        let game_path = dir.path().join("game.ssl");
+        let target = dir.path().join("Level2.SSL");
+        std::fs::write(&game_path, b"fake").unwrap();
+        std::fs::write(&target, b"fake").unwrap();
+
+        let result = ContentLoader::find_content_file(&game_path, "level2.ssl");
+        // On Windows, tempfile may normalize case, so just check it was found
+        assert!(
+            result.is_some(),
+            "case-insensitive lookup should find the file"
+        );
+        assert!(result.unwrap().exists());
+    }
+
+    #[test]
+    fn test_find_content_file_in_subdirectory() {
+        let dir = tempfile::tempdir().unwrap();
+        let game_path = dir.path().join("game.ssl");
+        let sub = dir.path().join("levels");
+        std::fs::create_dir(&sub).unwrap();
+        let target = sub.join("level2.ssl");
+        std::fs::write(&game_path, b"fake").unwrap();
+        std::fs::write(&target, b"fake").unwrap();
+
+        let result = ContentLoader::find_content_file(&game_path, "levels/level2.ssl");
+        assert_eq!(result, Some(target));
+    }
+
+    #[test]
+    fn test_find_content_file_fuzzy_subdirectory() {
+        let dir = tempfile::tempdir().unwrap();
+        let game_path = dir.path().join("game.ssl");
+        let sub = dir.path().join("BBLADE");
+        std::fs::create_dir(&sub).unwrap();
+        let target = sub.join("level2.ssl");
+        std::fs::write(&game_path, b"fake").unwrap();
+        std::fs::write(&target, b"fake").unwrap();
+
+        // Query with trailing spaces (common in Native32 games)
+        let result = ContentLoader::find_content_file(&game_path, "BBLADE  /level2.ssl");
+        assert_eq!(result, Some(target));
+    }
+}
