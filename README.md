@@ -37,11 +37,20 @@ cargo build --release
 
 ### Libretro Core (for RetroArch)
 
+**Windows:**
+```cmd
+build-libretro.bat
+```
+
+**Linux/macOS:**
 ```bash
-cargo build --lib --release --features libretro --no-default-features
+chmod +x build-libretro.sh
+./build-libretro.sh
 ```
 
 This produces a dynamic library (`native32emu.dll` on Windows, `libnative32emu.so` on Linux, `native32emu.dylib` on macOS) that can be loaded by RetroArch.
+
+**Note:** The libretro build uses a separate Cargo.toml configuration to avoid Windows DLL export symbol limits.
 
 ## Usage
 
