@@ -1,0 +1,2 @@
+# Keep shell scripts LF so they run on Linux/macOS regardless of host settings.
+*.sh text eol=lf

@@ -37,11 +37,30 @@ cargo build --release
 
 ### Libretro Core (for RetroArch)
 
+Use the helper script, which builds the core and stages it (with the correct
+`_libretro` file name that RetroArch expects) into a `dist/` directory:
+
+```bash
+# Linux / macOS
+./scripts/build-libretro.sh
+
+# Windows (PowerShell)
+./scripts/build-libretro.ps1
+```
+
+This produces `dist/native32emu_libretro.dll` on Windows
+(`native32emu_libretro.so` on Linux, `native32emu_libretro.dylib` on macOS)
+together with `native32emu_libretro.info`, both ready to drop into RetroArch.
+
+If you prefer to build manually:
+
 ```bash
 cargo rustc --lib --release --features libretro --no-default-features --crate-type cdylib
 ```
 
-This produces a dynamic library (`native32emu.dll` on Windows, `libnative32emu.so` on Linux, `native32emu.dylib` on macOS) that can be loaded by RetroArch.
+Note that a manual build produces `native32emu.dll` (or `libnative32emu.so` /
+`libnative32emu.dylib`); RetroArch requires the file to be renamed with a
+`_libretro` suffix, which the helper script does for you.
 
 ## Usage
 
@@ -62,8 +81,8 @@ cargo run --release -- path/to/game.smf
 
 1. **Build the libretro core** (see Building section above)
 2. **Install the core**:
-   - Copy `target/release/native32emu.dll` (or `.so`/`.dylib`) to RetroArch's `cores/` directory
-   - Copy `core.info` to the same `cores/` directory
+   - Copy `dist/native32emu_libretro.dll` (or `.so`/`.dylib`) to RetroArch's `cores/` directory
+   - Copy `dist/native32emu_libretro.info` to RetroArch's `info/` directory
 3. **Load the core in RetroArch**:
    - Open RetroArch
    - Select "Load Core" → "Native32 (Native32Emu)"
@@ -114,32 +133,36 @@ cargo run -- --screenshot screenshot.png --screenshot-frames 30 native32_game/EA
 
 ```
 src/
-├── main.rs              # Emulation loop and VmHost implementation (standalone)
-├── lib.rs               # Library entry point (for libretro core)
-├── cli.rs               # Command-line argument parsing (standalone only)
-├── actions.rs           # Action opcode enum (36 opcodes)
-├── action_vm.rs         # Stack-based virtual machine
-├── audio_engine.rs      # MP3/PCM audio playback (rodio for standalone, buffer for libretro)
-├── content_loader.rs    # SSL multi-file content switching
-├── des_constants.rs     # DES permutation tables and S-boxes
-├── error.rs             # Error types
-├── file_loader.rs       # File I/O, header parsing, resource tables
-├── frame_player.rs      # Main timeline frame playback (30fps)
-├── header_decryptor.rs  # Custom DES ECB header decryption
-├── image_decoder.rs     # YUV 4:2:0 and ARGB1555 image decoders
-├── input_handler.rs     # Keyboard input to keycode mapping
-├── renderer.rs          # Frame rendering with depth sorting
-├── save_manager.rs      # Save data persistence (.ssl_sav)
-├── sprite_system.rs     # Movie/sprite instance management
-├── core_emulator/       # Core emulator for libretro mode
+├── lib.rs                   # Library crate root (module declarations)
+├── main.rs                  # Standalone binary entry point (thin front-end)
+├── core/                    # Platform-independent emulator core (shared)
 │   ├── mod.rs
-│   └── emulator.rs      # Emulator implementation without window/audio dependencies
-└── libretro/            # libretro API implementation
+│   ├── emulator.rs          # Shared Emulator + VmHost (standalone & libretro)
+│   ├── actions.rs           # Action opcode enum (36 opcodes)
+│   ├── action_vm.rs         # Stack-based virtual machine
+│   ├── audio_engine.rs      # MP3/PCM audio (rodio for standalone, buffer for libretro)
+│   ├── content_loader.rs    # SSL multi-file content switching
+│   ├── des_constants.rs     # DES permutation tables and S-boxes
+│   ├── error.rs             # Error types
+│   ├── file_loader.rs       # File I/O, header parsing, resource tables
+│   ├── frame_player.rs      # Main timeline frame playback (30fps)
+│   ├── header_decryptor.rs  # Custom DES ECB header decryption
+│   ├── image_decoder.rs     # YUV 4:2:0 and ARGB1555 image decoders
+│   ├── input_handler.rs     # Input to keycode mapping (keyboard / RetroPad)
+│   ├── renderer.rs          # Frame rendering with depth sorting
+│   ├── save_manager.rs      # Save data persistence (.ssl_sav)
+│   └── sprite_system.rs     # Movie/sprite instance management
+├── standalone/              # Standalone-only front-end
+│   ├── mod.rs
+│   ├── cli.rs               # Command-line argument parsing
+│   └── gamepad_overlay.rs   # On-screen virtual gamepad overlay
+└── libretro/                # libretro API implementation (feature = "libretro")
     ├── mod.rs
-    ├── api.rs           # Exported libretro functions (retro_init, retro_run, etc.)
-    ├── callbacks.rs     # Callback management for video/audio/input
-    ├── constants.rs     # libretro constants
-    └── types.rs         # libretro type definitions
+    ├── api.rs               # Exported libretro functions (retro_init, retro_run, etc.)
+    ├── callbacks.rs         # Callback management for video/audio/input
+    ├── constants.rs         # libretro constants
+    ├── logger.rs            # Bridges the `log` crate to the libretro log interface
+    └── types.rs             # libretro type definitions
 ```
 
 ## Dependencies

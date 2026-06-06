@@ -73,6 +73,44 @@ jobs:
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
+      - name: Build libretro core
+        shell: bash
+        run: |
+          cargo rustc --lib --release --target ${{ matrix.target }} \
+            --features libretro --no-default-features --crate-type cdylib
+
+      - name: Stage libretro core
+        shell: bash
+        run: |
+          out="libretro/${{ matrix.artifact }}"
+          mkdir -p "$out"
+          rel="target/${{ matrix.target }}/release"
+          for f in "native32emu.dll" "libnative32emu.so" "libnative32emu.dylib"; do
+            if [ -f "$rel/$f" ]; then
+              ext="${f##*.}"
+              cp "$rel/$f" "$out/native32emu_libretro.$ext"
+              break
+            fi
+          done
+          cp native32emu_libretro.info "$out/native32emu_libretro.info"
+          ls -la "$out"
+
+      - name: Package libretro (Unix)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cd libretro
+          tar czf ../${{ matrix.artifact }}-libretro.tar.gz ${{ matrix.artifact }}
+          cd ..
+
+      - name: Package libretro (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cd libretro
+          7z a ../${{ matrix.artifact }}-libretro.zip ${{ matrix.artifact }}
+          cd ..
+
       - name: Package (Unix)
         if: runner.os != 'Windows'
         shell: bash
@@ -93,7 +131,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}.*
+          path: |
+            ${{ matrix.artifact }}.*
+            ${{ matrix.artifact }}-libretro.*
           retention-days: 7
 
   release:
@@ -143,6 +183,7 @@ jobs:
           - Built: $DATETIME
           - Commit: [\`$SHORT_SHA\`](https://github.com/$REPO/commit/${{ github.sha }})
           - Platforms: Windows x86_64, macOS x86_64/aarch64, Linux x86_64/aarch64
+          - Includes the standalone emulator and the libretro core (\`*-libretro.*\`) for RetroArch
 
           ⚠️ Unsigned build: Windows SmartScreen / macOS Gatekeeper may block on first launch.
           EOF
