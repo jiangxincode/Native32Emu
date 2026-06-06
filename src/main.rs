@@ -437,7 +437,14 @@ impl VmHost for Emulator {
                 ActionProp::Y => movie.y.to_string(),
                 ActionProp::Visible => (movie.visible as i32).to_string(),
                 ActionProp::CurrentFrame => {
-                    if movie.next_frame.is_none() && movie.playing {
+                    // When a frame change is pending (e.g. set by GotoFrame2 within
+                    // the same tick), report the pending target frame. Otherwise the
+                    // stale current frame would be returned, which breaks games that
+                    // read _currentframe right after redirecting a movie (e.g. the
+                    // attack-animation logic in EBBLADE / EMETAL).
+                    if let Some(nf) = movie.next_frame {
+                        (nf.max(0) as u32 + 1).to_string()
+                    } else if movie.playing {
                         (movie.frame as u32 + 2).to_string()
                     } else {
                         (movie.frame as u32 + 1).to_string()
