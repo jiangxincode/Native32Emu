@@ -122,33 +122,6 @@ impl Emulator {
                         .run(&mut (*self_ptr).reader, &mut *self_ptr, action_idx, "");
                 }
             }
-
-            // Then execute movie actions
-            let movie_action_list: Vec<(String, u32)> = {
-                let mut list = Vec::new();
-                let names: Vec<String> = self.sprites.sprites.keys().cloned().collect();
-                for name in &names {
-                    if let Some(movie) = self.sprites.get(name) {
-                        let movie_frames = self.reader.get_movie(movie.movie);
-                        if movie.frame < movie_frames.len() {
-                            let mf = &movie_frames[movie.frame];
-                            if mf.action != 0 {
-                                list.push((name.clone(), mf.action as u32));
-                            }
-                        }
-                    }
-                }
-                list
-            };
-
-            let self_ptr = self as *mut Emulator;
-            unsafe {
-                for (name, action_idx) in movie_action_list {
-                    (*self_ptr)
-                        .vm
-                        .run(&mut (*self_ptr).reader, &mut *self_ptr, action_idx, &name);
-                }
-            }
         }
 
         // Advance movie frames
