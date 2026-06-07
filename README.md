@@ -224,6 +224,12 @@ Contributions are welcome! Whether you're interested in fixing bugs, adding feat
 - [n32emu](https://github.com/gatecat/n32emu) by Myrtle Shah — the Python reference implementation
 - [BootlegGames Wiki](https://bootleggames.fandom.com/wiki/Native_32) — hardware documentation and game catalog
 
+## Community
+
+Welcome to join the QQ group to discuss Native32 games, report issues, or share childhood memories:
+
+<img src="res/qrcode_1780795368223.jpg" alt="QQ交流群" width="200">
+
 ## License
 
 This project is licensed under the [BSD 3-Clause License](LICENSE).
