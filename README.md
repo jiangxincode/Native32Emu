@@ -166,23 +166,6 @@ crates/
             └── types.rs         # libretro type definitions
 ```
 
-## Dependencies
-
-### Standalone Mode
-
-| Crate | Purpose |
-|---|---|
-| `clap` | Command-line argument parsing |
-| `minifb` | Window creation and pixel rendering |
-| `rodio` | Audio playback (MP3 + PCM) |
-| `anyhow` / `thiserror` | Error handling |
-| `log` / `env_logger` | Logging |
-| `rand` | Random number generation (for VM `RandomNumber` opcode) |
-
-### Libretro Mode
-
-The libretro core has minimal dependencies - only the core emulation libraries are used. Window management and audio playback are handled by the RetroArch frontend through callbacks.
-
 ## RetroArch Integration
 
 Native32Emu can be used as a libretro core with RetroArch, allowing you to play Native32 games with RetroArch's features like shaders, netplay, and achievements.
