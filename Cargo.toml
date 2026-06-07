@@ -13,16 +13,16 @@ description = "A Native32 game emulator written in Rust"
 license = "BSD-3-Clause"
 
 [workspace.dependencies]
-native32emu-core = { path = "crates/native32emu-core" }
-anyhow = "1"
-thiserror = "2"
-log = "0.4"
-rand = "0.10"
-image = "0.25"
-clap = { version = "4", features = ["derive"] }
-minifb = "0.28"
-rodio = { version = "0.22", features = ["mp3"] }
-env_logger = "0.11"
+native32emu-core = { path = "crates/native32emu-core" }  # Platform-independent emulator engine
+anyhow = "1"              # Error handling (ergonomic Result types)
+thiserror = "2"           # Error handling (custom error enums)
+log = "0.4"               # Logging facade
+rand = "0.10"             # Random number generation (VM RandomNumber opcode)
+image = "0.25"            # Image processing
+clap = { version = "4", features = ["derive"] }  # CLI argument parsing (standalone)
+minifb = "0.28"           # Window creation and pixel rendering (standalone)
+rodio = { version = "0.22", features = ["mp3"] }  # Audio playback, MP3 + PCM (standalone)
+env_logger = "0.11"       # Log output to stderr (standalone)
 
 [profile.release]
 opt-level = 3
