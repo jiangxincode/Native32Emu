@@ -27,9 +27,9 @@ Native32 is a game format developed by Sunplus for DVD player and TV chipsets (c
 
 ## Usage
 
-Download the latest binary from the [Releases](https://github.com/jiangxincode/Native32Emu/releases) page.
-
 ### Standalone Mode
+
+Download the latest binary from the [Releases](https://github.com/jiangxincode/Native32Emu/releases) page.
 
 ```bash
 # Basic usage
@@ -77,6 +77,8 @@ native32-emu --screenshot screenshot.png --screenshot-frames 30 game.smf
 
 ### RetroArch Mode
 
+Native32Emu can be used as a libretro core with RetroArch, allowing you to play Native32 games with RetroArch's features like shaders, netplay, and achievements.
+
 1. **Download the libretro core** from the [Releases](https://github.com/jiangxincode/Native32Emu/releases) page
 2. **Install the core**:
    - Copy `native32emu_libretro.dll` (or `.so`/`.dylib`) to RetroArch's `cores/` directory
@@ -85,7 +87,33 @@ native32-emu --screenshot screenshot.png --screenshot-frames 30 game.smf
    - Open RetroArch
    - Select "Load Core" → "Native32 (Native32Emu)"
    - Select "Load Content" and choose a `.smf`, `.sgm`, or `.ssl` game file
-4. **Controls**: Use keyboard or gamepad (D-Pad for directions, Z=A, X=B)
+
+#### Supported Features
+
+- ✅ Video output (XRGB8888 pixel format)
+- ✅ Audio output (RAW PCM, stereo)
+- ✅ Input handling (D-Pad + A/B buttons)
+- ✅ Game loading (.smf, .sgm, .ssl files)
+- ⚠️ MP3 audio (not yet implemented — only RAW PCM works)
+- ❌ Save states (not yet implemented)
+- ❌ Core options (not yet implemented)
+
+#### RetroPad Button Mapping
+
+| RetroPad Button | Native32 Keycode | Action |
+|----------------|------------------|--------|
+| D-Pad Left | 0x0200 | Left |
+| D-Pad Right | 0x0400 | Right |
+| D-Pad Up | 0x1c00 | Up |
+| D-Pad Down | 0x1e00 | Down |
+| A (SNES East) | 0x8800 | B / Menu |
+| B (SNES South) | 0x4000 | A |
+
+#### Audio Notes
+
+- **RAW PCM**: Fully supported (11025Hz for YUV games, 22050Hz for ARGB games)
+- **MP3**: Not yet supported in libretro mode (games using MP3 will have no music)
+- Audio is output as stereo (mono sources are duplicated to both channels)
 
 ## Building
 
@@ -165,37 +193,6 @@ crates/
             ├── logger.rs        # Bridges the `log` crate to the libretro log interface
             └── types.rs         # libretro type definitions
 ```
-
-## RetroArch Integration
-
-Native32Emu can be used as a libretro core with RetroArch, allowing you to play Native32 games with RetroArch's features like shaders, netplay, and achievements.
-
-### Supported Features
-
-- ✅ Video output (XRGB8888 pixel format)
-- ✅ Audio output (RAW PCM, stereo)
-- ✅ Input handling (D-Pad + A/B buttons)
-- ✅ Game loading (.smf, .sgm, .ssl files)
-- ⚠️ MP3 audio (not yet implemented - only RAW PCM works)
-- ❌ Save states (not yet implemented)
-- ❌ Core options (not yet implemented)
-
-### RetroPad Button Mapping
-
-| RetroPad Button | Native32 Keycode | Action |
-|----------------|------------------|--------|
-| D-Pad Left | 0x0200 | Left |
-| D-Pad Right | 0x0400 | Right |
-| D-Pad Up | 0x1c00 | Up |
-| D-Pad Down | 0x1e00 | Down |
-| A (SNES East) | 0x8800 | B / Menu |
-| B (SNES South) | 0x4000 | A |
-
-### Audio Notes
-
-- **RAW PCM**: Fully supported (11025Hz for YUV games, 22050Hz for ARGB games)
-- **MP3**: Not yet supported in libretro mode (games using MP3 will have no music)
-- Audio is output as stereo (mono sources are duplicated to both channels)
 
 ## Game Compatibility
 
