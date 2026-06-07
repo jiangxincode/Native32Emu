@@ -138,6 +138,31 @@ cargo build -p native32emu-libretro --release
 This produces `native32emu_libretro.dll` on Windows (`libnative32emu_libretro.so`
 on Linux, `libnative32emu_libretro.dylib` on macOS) under `target/release/`.
 
+#### Distributing via RetroArch's Online Updater
+
+To make the core installable directly from RetroArch (Online Updater > Core
+Downloader), it needs to be added to the Libretro build infrastructure. The
+repository ships the two files the buildbot requires:
+
+- `Makefile` — wraps `cargo build` so the buildbot's `make` invocation produces
+  `native32emu_libretro.<ext>` (it maps the libretro `platform`/`arch`
+  variables to the matching Rust target triple for cross-compilation).
+- `.gitlab-ci.yml` — the buildbot recipe that builds the core for Windows,
+  Linux and macOS using the official `libretro-infrastructure/ci-templates`.
+
+Remaining steps (done against Libretro's own repositories):
+
+1. Submit `crates/native32emu-libretro/native32emu_libretro.info` to the
+   [libretro-super `dist/info`](https://github.com/libretro/libretro-super/tree/master/dist/info)
+   directory via a pull request.
+2. Ask the Libretro team to register this repository's `.gitlab-ci.yml` recipe
+   so the buildbot starts building the core (see the
+   [forum thread on adding a new core](https://forums.libretro.com/t/i-have-a-new-core-what-to-do/37582)).
+3. (Optional, for playlists) add core icons to
+   [retroarch-assets](https://github.com/libretro/retroarch-assets) and game
+   entries to the [libretro-database](https://github.com/libretro/libretro-database).
+4. (Optional) add core documentation to [libretro/docs](https://github.com/libretro/docs#adding-a-new-core).
+
 ## Testing
 
 Run the unit tests:
