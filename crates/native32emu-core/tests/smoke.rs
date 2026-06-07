@@ -141,3 +141,106 @@ fn run_one(path: &Path) -> Result<bool, String> {
 
     Ok(frame_has_content(emu.get_framebuffer()))
 }
+
+// ---------------------------------------------------------------------------
+// Scripted-input regression harness
+//
+// GUI / interaction bugs (e.g. "pressing a key on a menu freezes the screen")
+// are hard to catch with the plain smoke test because that test never feeds any
+// input. The helpers below turn such interactions into deterministic, headless
+// regression tests: input is scripted per-frame and the emulator core is driven
+// directly, so there is no window and no timing dependency. The Action VM is
+// seeded deterministically, so a given input script always produces the same
+// run.
+// ---------------------------------------------------------------------------
+
+/// Native32 keycode for the Z / "A" button (menu confirm).
+const KEY_Z: u16 = 0x4000;
+
+/// Locate a game asset by file name (case-insensitive) under `dir`.
+fn find_asset(dir: &Path, file_name: &str) -> Option<PathBuf> {
+    let mut all = Vec::new();
+    collect_games(dir, &mut all);
+    all.into_iter().find(|p| {
+        p.file_name()
+            .and_then(|n| n.to_str())
+            .is_some_and(|n| n.eq_ignore_ascii_case(file_name))
+    })
+}
+
+/// Drive a game headlessly with a per-frame input script.
+///
+/// `input_for_frame(frame)` returns the Native32 keycodes held during that
+/// frame. The closure is called for every frame from 0 to `frames - 1`. The
+/// returned emulator can be inspected for final state (loaded content, sprite
+/// positions, etc.).
+fn run_scripted<F>(path: &Path, frames: u32, mut input_for_frame: F) -> Result<Emulator, String>
+where
+    F: FnMut(u32) -> Vec<u16>,
+{
+    let mut emu =
+        Emulator::from_path(path.to_path_buf(), 100).map_err(|e| format!("failed to load: {e}"))?;
+    for frame in 0..frames {
+        let pressed = input_for_frame(frame);
+        emu.set_buttons(&pressed);
+        emu.handle_buttons();
+        emu.tick();
+        emu.draw();
+    }
+    Ok(emu)
+}
+
+/// Regression test for the GunFire menu freeze: holding the confirm button on
+/// the start menu must navigate to the next screen instead of freezing.
+///
+/// Previously a redundant per-frame movie-action pass kept re-issuing the
+/// `Stop` keyframe action of the selection movie, so its confirm animation
+/// never advanced and the menu never progressed. We assert the loaded content
+/// actually switches once confirm is held.
+#[test]
+#[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
+fn gunfire_menu_advances_on_confirm() {
+    let dir = match game_dir() {
+        Some(d) => d,
+        None => {
+            eprintln!("skipping: no game directory found (set NATIVE32_GAME_DIR)");
+            return;
+        }
+    };
+
+    let menu = match find_asset(&dir, "GFSTART.SSL") {
+        Some(p) => p,
+        None => {
+            eprintln!("skipping: GFSTART.SSL not found under {}", dir.display());
+            return;
+        }
+    };
+
+    // Warm up for 40 frames with no input so the menu is fully shown, then hold
+    // the confirm button. The selection animation should play and the menu
+    // should load the next screen, i.e. the loaded content file changes.
+    const WARMUP: u32 = 40;
+    const TOTAL: u32 = 160;
+
+    let emu = run_scripted(&menu, TOTAL, |frame| {
+        if frame >= WARMUP {
+            vec![KEY_Z]
+        } else {
+            vec![]
+        }
+    })
+    .expect("run gunfire menu");
+
+    let final_name = emu
+        .filename
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_string();
+
+    assert!(
+        !final_name.eq_ignore_ascii_case("GFSTART.SSL"),
+        "menu did not advance after holding confirm: still on {final_name} \
+         (selection animation appears frozen)"
+    );
+}

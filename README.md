@@ -6,6 +6,8 @@
 
 <p align="center">
   <a href="https://github.com/jiangxincode/Native32Emu/actions/workflows/ci.yml"><img src="https://github.com/jiangxincode/Native32Emu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/jiangxincode/Native32Emu/releases/latest"><img src="https://img.shields.io/github/v/release/jiangxincode/Native32Emu" alt="Release"></a>
+  <a href="https://github.com/jiangxincode/Native32Emu/releases"><img src="https://img.shields.io/github/downloads/jiangxincode/Native32Emu/total" alt="Downloads"></a>
   <a href="https://sonarcloud.io/dashboard?id=jiangxincode_Native32Emu"><img src="https://sonarcloud.io/api/project_badges/measure?project=jiangxincode_Native32Emu&metric=alert_status" alt="Quality Gate Status"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-BSD%203--Clause-blue.svg" alt="License: BSD 3-Clause"></a>
 </p>
@@ -24,6 +26,96 @@ Native32 is a game format developed by Sunplus for DVD player and TV chipsets (c
 - **SSL multi-file content** — seamless switching between game levels/files
 - **CLI controls** — scaling, fullscreen, volume adjustment
 - **RetroArch integration** — libretro core for use with RetroArch frontend
+
+## Usage
+
+### Standalone Mode
+
+Download the latest binary from the [Releases](https://github.com/jiangxincode/Native32Emu/releases) page.
+
+```bash
+# Basic usage
+native32-emu path/to/game.smf
+
+# With options
+native32-emu --scale 2 --volume 80 path/to/game.smf
+
+# 2x scaling with 50% volume
+native32-emu --scale 2 --volume 50 game.smf
+
+# Remap A button to Space
+native32-emu --remap "0x4000:space" game.smf
+
+# Fullscreen mode
+native32-emu --fullscreen game.smf
+
+# Take a screenshot after 30 frames and exit
+native32-emu --screenshot screenshot.png --screenshot-frames 30 game.smf
+```
+
+#### Command-line Options
+
+| Option | Description | Default |
+|---|---|---|
+| `<GAME_PATH>` | Path to the game file (`.smf`, `.sgm`, or `.ssl`) | *required* |
+| `-s, --scale <1-16>` | Integer scaling factor | `1` |
+| `-f, --fullscreen` | Run in fullscreen mode | off |
+| `-v, --volume <0-100>` | Volume level (0 = mute, 100 = original) | `100` |
+| `-S, --screenshot <PATH>` | Take a screenshot and exit (saves as PNG) | — |
+| `--screenshot-frames <N>` | Frames to run before screenshot | `30` |
+| `--debug` | Enable debug/development mode | off |
+| `--remap <keycode:key>` | Remap a Native32 keycode to a physical key | — |
+
+#### Default Key Mappings
+
+| Native32 Keycode | Physical Key | Action |
+|---|---|---|
+| `0x0200` | ← Left | Left |
+| `0x0400` | → Right | Right |
+| `0x1c00` | ↑ Up | Up |
+| `0x1e00` | ↓ Down | Down |
+| `0x4000` | Z | A |
+| `0x8800` | X | B / Menu |
+
+### RetroArch Mode
+
+Native32Emu can be used as a libretro core with RetroArch, allowing you to play Native32 games with RetroArch's features like shaders, netplay, and achievements.
+
+1. **Download the libretro core** from the [Releases](https://github.com/jiangxincode/Native32Emu/releases) page
+2. **Install the core**:
+   - Copy `native32emu_libretro.dll` (or `.so`/`.dylib`) to RetroArch's `cores/` directory
+   - Copy `native32emu_libretro.info` to RetroArch's `info/` directory
+3. **Load the core in RetroArch**:
+   - Open RetroArch
+   - Select "Load Core" → "Native32 (Native32Emu)"
+   - Select "Load Content" and choose a `.smf`, `.sgm`, or `.ssl` game file
+
+#### Supported Features
+
+- ✅ Video output (XRGB8888 pixel format)
+- ✅ Audio output (RAW PCM, stereo)
+- ✅ Input handling (D-Pad + A/B buttons)
+- ✅ Game loading (.smf, .sgm, .ssl files)
+- ⚠️ MP3 audio (not yet implemented — only RAW PCM works)
+- ❌ Save states (not yet implemented)
+- ❌ Core options (not yet implemented)
+
+#### RetroPad Button Mapping
+
+| RetroPad Button | Native32 Keycode | Action |
+|----------------|------------------|--------|
+| D-Pad Left | 0x0200 | Left |
+| D-Pad Right | 0x0400 | Right |
+| D-Pad Up | 0x1c00 | Up |
+| D-Pad Down | 0x1e00 | Down |
+| A (SNES East) | 0x8800 | B / Menu |
+| B (SNES South) | 0x4000 | A |
+
+#### Audio Notes
+
+- **RAW PCM**: Fully supported (11025Hz for YUV games, 22050Hz for ARGB games)
+- **MP3**: Not yet supported in libretro mode (games using MP3 will have no music)
+- Audio is output as stereo (mono sources are duplicated to both channels)
 
 ## Building
 
@@ -44,75 +136,32 @@ cargo build -p native32emu-libretro --release
 ```
 
 This produces `native32emu_libretro.dll` on Windows (`libnative32emu_libretro.so`
-on Linux, `libnative32emu_libretro.dylib` on macOS) under `target/release/`. The
-file is named exactly the way RetroArch expects, so no renaming is needed.
+on Linux, `libnative32emu_libretro.dylib` on macOS) under `target/release/`.
 
-## Usage
+#### Distributing via RetroArch's Online Updater
 
-### Standalone Mode
+To make the core installable directly from RetroArch (Online Updater > Core
+Downloader), it needs to be added to the Libretro build infrastructure. The
+repository ships the two files the buildbot requires:
 
-```bash
-# Basic usage
-cargo run -p native32emu -- path/to/game.smf
+- `Makefile` — wraps `cargo build` so the buildbot's `make` invocation produces
+  `native32emu_libretro.<ext>` (it maps the libretro `platform`/`arch`
+  variables to the matching Rust target triple for cross-compilation).
+- `.gitlab-ci.yml` — the buildbot recipe that builds the core for Windows,
+  Linux and macOS using the official `libretro-infrastructure/ci-templates`.
 
-# With options
-cargo run -p native32emu -- --scale 2 --volume 80 path/to/game.smf
+Remaining steps (done against Libretro's own repositories):
 
-# Release build
-cargo run -p native32emu --release -- path/to/game.smf
-```
-
-### RetroArch Mode
-
-1. **Build the libretro core** (see Building section above)
-2. **Install the core**:
-   - Copy `target/release/native32emu_libretro.dll` (or `.so`/`.dylib`) to RetroArch's `cores/` directory
-   - Copy `crates/native32emu-libretro/native32emu_libretro.info` to RetroArch's `info/` directory
-3. **Load the core in RetroArch**:
-   - Open RetroArch
-   - Select "Load Core" → "Native32 (Native32Emu)"
-   - Select "Load Content" and choose a `.smf`, `.sgm`, or `.ssl` game file
-4. **Controls**: Use keyboard or gamepad (D-Pad for directions, Z=A, X=B)
-
-### Command-line Options
-
-| Option | Description | Default |
-|---|---|---|
-| `<GAME_PATH>` | Path to the game file (`.smf`, `.sgm`, or `.ssl`) | *required* |
-| `-s, --scale <1-16>` | Integer scaling factor | `1` |
-| `-f, --fullscreen` | Run in fullscreen mode | off |
-| `-v, --volume <0-100>` | Volume level (0 = mute, 100 = original) | `100` |
-| `-S, --screenshot <PATH>` | Take a screenshot and exit (saves as PNG) | — |
-| `--screenshot-frames <N>` | Frames to run before screenshot | `30` |
-| `--debug` | Enable debug/development mode | off |
-| `--remap <keycode:key>` | Remap a Native32 keycode to a physical key | — |
-
-### Default Key Mappings
-
-| Native32 Keycode | Physical Key | Action |
-|---|---|---|
-| `0x0200` | ← Left | Left |
-| `0x0400` | → Right | Right |
-| `0x1c00` | ↑ Up | Up |
-| `0x1e00` | ↓ Down | Down |
-| `0x4000` | Z | A |
-| `0x8800` | X | B / Menu |
-
-### Examples
-
-```bash
-# 2x scaling with 50% volume
-cargo run -- --scale 2 --volume 50 native32_game/FHUI.smf
-
-# Remap A button to Space
-cargo run -- --remap "0x4000:space" native32_game/FHUI.smf
-
-# Fullscreen mode
-cargo run -- --fullscreen native32_game/EACT/EBBLADE.smf
-
-# Take a screenshot after 30 frames and exit
-cargo run -- --screenshot screenshot.png --screenshot-frames 30 native32_game/EACT/EBBLADE.smf
-```
+1. Submit `crates/native32emu-libretro/native32emu_libretro.info` to the
+   [libretro-super `dist/info`](https://github.com/libretro/libretro-super/tree/master/dist/info)
+   directory via a pull request.
+2. Ask the Libretro team to register this repository's `.gitlab-ci.yml` recipe
+   so the buildbot starts building the core (see the
+   [forum thread on adding a new core](https://forums.libretro.com/t/i-have-a-new-core-what-to-do/37582)).
+3. (Optional, for playlists) add core icons to
+   [retroarch-assets](https://github.com/libretro/retroarch-assets) and game
+   entries to the [libretro-database](https://github.com/libretro/libretro-database).
+4. (Optional) add core documentation to [libretro/docs](https://github.com/libretro/docs#adding-a-new-core).
 
 ## Testing
 
@@ -172,79 +221,6 @@ crates/
             └── types.rs         # libretro type definitions
 ```
 
-## Dependencies
-
-### Standalone Mode
-
-| Crate | Purpose |
-|---|---|
-| `clap` | Command-line argument parsing |
-| `minifb` | Window creation and pixel rendering |
-| `rodio` | Audio playback (MP3 + PCM) |
-| `anyhow` / `thiserror` | Error handling |
-| `log` / `env_logger` | Logging |
-| `rand` | Random number generation (for VM `RandomNumber` opcode) |
-
-### Libretro Mode
-
-The libretro core has minimal dependencies - only the core emulation libraries are used. Window management and audio playback are handled by the RetroArch frontend through callbacks.
-
-## RetroArch Integration
-
-Native32Emu can be used as a libretro core with RetroArch, allowing you to play Native32 games with RetroArch's features like shaders, netplay, and achievements.
-
-### Distributing via RetroArch's Online Updater
-
-To make the core installable directly from RetroArch (Online Updater > Core
-Downloader), it needs to be added to the Libretro build infrastructure. The
-repository ships the two files the buildbot requires:
-
-- `Makefile` — wraps `cargo build` so the buildbot's `make` invocation produces
-  `native32emu_libretro.<ext>` (it maps the libretro `platform`/`arch`
-  variables to the matching Rust target triple for cross-compilation).
-- `.gitlab-ci.yml` — the buildbot recipe that builds the core for Windows,
-  Linux and macOS using the official `libretro-infrastructure/ci-templates`.
-
-Remaining steps (done against Libretro's own repositories):
-
-1. Submit `crates/native32emu-libretro/native32emu_libretro.info` to the
-   [libretro-super `dist/info`](https://github.com/libretro/libretro-super/tree/master/dist/info)
-   directory via a pull request.
-2. Ask the Libretro team to register this repository's `.gitlab-ci.yml` recipe
-   so the buildbot starts building the core (see the
-   [forum thread on adding a new core](https://forums.libretro.com/t/i-have-a-new-core-what-to-do/37582)).
-3. (Optional, for playlists) add core icons to
-   [retroarch-assets](https://github.com/libretro/retroarch-assets) and game
-   entries to the [libretro-database](https://github.com/libretro/libretro-database).
-4. (Optional) add core documentation to [libretro/docs](https://github.com/libretro/docs#adding-a-new-core).
-
-### Supported Features
-
-- ✅ Video output (XRGB8888 pixel format)
-- ✅ Audio output (RAW PCM, stereo)
-- ✅ Input handling (D-Pad + A/B buttons)
-- ✅ Game loading (.smf, .sgm, .ssl files)
-- ⚠️ MP3 audio (not yet implemented - only RAW PCM works)
-- ❌ Save states (not yet implemented)
-- ❌ Core options (not yet implemented)
-
-### RetroPad Button Mapping
-
-| RetroPad Button | Native32 Keycode | Action |
-|----------------|------------------|--------|
-| D-Pad Left | 0x0200 | Left |
-| D-Pad Right | 0x0400 | Right |
-| D-Pad Up | 0x1c00 | Up |
-| D-Pad Down | 0x1e00 | Down |
-| A (SNES East) | 0x8800 | B / Menu |
-| B (SNES South) | 0x4000 | A |
-
-### Audio Notes
-
-- **RAW PCM**: Fully supported (11025Hz for YUV games, 22050Hz for ARGB games)
-- **MP3**: Not yet supported in libretro mode (games using MP3 will have no music)
-- Audio is output as stereo (mono sources are duplicated to both channels)
-
 ## Game Compatibility
 
 Game resources can be downloaded from [Baidu Netdisk](https://pan.baidu.com/s/1b5sY3JFEP2HtxiKngOJ3VA?pwd=aloy).
@@ -262,40 +238,22 @@ All 84 Native32 games in the test suite load and run without fatal errors.
 | ETAB (Chess/Board) | 4 | ✅ Pass |
 | **Total** | **84** | **✅ All Passed** |
 
-For detailed game list with screenshots and descriptions, see the [Game Compatibility](https://github.com/jiangxincode/Native32Emu/wiki/Game-Compatibility) wiki page.
+For detailed game list with screenshots and descriptions, see [Game Compatibility](docs/Game-Compatibility.md).
 
 ## Contribute
 
-Contributions are welcome! Whether you're interested in fixing bugs, adding features, improving documentation, or testing game compatibility, we'd love your help.
-
-### How to Contribute
-
-1. **Fork** this repository
-2. **Create** a feature branch (`git checkout -b feature/your-feature`)
-3. **Commit** your changes (`git commit -m 'Add your feature'`)
-4. **Push** to the branch (`git push origin feature/your-feature`)
-5. **Open** a Pull Request
-
-### Areas That Need Help
-
-- **Game compatibility testing** — test more games and report issues with screenshots
-- **VM opcode implementation** — some rare opcodes are not yet fully implemented
-- **Audio/video support** — `.mpg` video playback is not yet supported
-- **Platform ports** — macOS and Linux testing and packaging
-- **Documentation** — improve wiki pages and code comments
-- **Bug reports** — if you find a game that doesn't work correctly, please open an issue
-- **RetroArch integration** — MP3 audio support, save states, core options
-
-### Getting Started
-
-Check the [open issues](https://github.com/jiangxincode/Native32Emu/issues) for tasks labeled `good first issue` or `help wanted`. If you have questions, feel free to open a discussion issue.
-
-To understand the Native32 game file formats (`.smf`, `.SSL`, `.dat`, `.mpg`, `.ssl_sav`) and their relationships, see the [Game File Formats](https://github.com/jiangxincode/Native32Emu/wiki/Game-File-Formats) wiki page.
+Contributions are welcome! Whether you're interested in fixing bugs, adding features, improving documentation, or testing game compatibility, we'd love your help. See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for details.
 
 ## Acknowledgments
 
 - [n32emu](https://github.com/gatecat/n32emu) by Myrtle Shah — the Python reference implementation
 - [BootlegGames Wiki](https://bootleggames.fandom.com/wiki/Native_32) — hardware documentation and game catalog
+
+## Community
+
+Welcome to join the QQ group to discuss Native32 games, report issues, or share childhood memories:
+
+<img src="res/qrcode_1780795368223.jpg" alt="QQ交流群" width="200">
 
 ## License
 
