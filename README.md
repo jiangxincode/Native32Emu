@@ -231,7 +231,7 @@ All 84 Native32 games in the test suite load and run without fatal errors.
 | ETAB (Chess/Board) | 4 | ✅ Pass |
 | **Total** | **84** | **✅ All Passed** |
 
-For detailed game list with screenshots and descriptions, see the [Game Compatibility](https://github.com/jiangxincode/Native32Emu/wiki/Game-Compatibility) wiki page.
+For detailed game list with screenshots and descriptions, see [Game Compatibility](docs/Game-Compatibility.md).
 
 ## Contribute
 
@@ -259,7 +259,7 @@ Contributions are welcome! Whether you're interested in fixing bugs, adding feat
 
 Check the [open issues](https://github.com/jiangxincode/Native32Emu/issues) for tasks labeled `good first issue` or `help wanted`. If you have questions, feel free to open a discussion issue.
 
-To understand the Native32 game file formats (`.smf`, `.SSL`, `.dat`, `.mpg`, `.ssl_sav`) and their relationships, see the [Game File Formats](https://github.com/jiangxincode/Native32Emu/wiki/Game-File-Formats) wiki page.
+To understand the Native32 game file formats (`.smf`, `.SSL`, `.dat`, `.mpg`, `.ssl_sav`) and their relationships, see [Game File Formats](docs/Game-File-Formats.md).
 
 ## Acknowledgments
 
