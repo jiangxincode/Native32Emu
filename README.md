@@ -90,6 +90,12 @@ Native32Emu can be used as a libretro core with RetroArch, allowing you to play 
    - Select "Load Core" → "Native32 (Native32Emu)"
    - Select "Load Content" and choose a `.smf`, `.sgm`, or `.ssl` game file
 
+#### RetroArch on Android
+
+The libretro core also runs on Android and can be reused by most Android
+RetroArch-based frontends. See [Android Libretro Core](docs/Android-Libretro-Core.md)
+for install and build instructions.
+
 #### Supported Features
 
 - ✅ Video output (XRGB8888 pixel format)
@@ -137,6 +143,8 @@ cargo build -p native32emu-libretro --release
 
 This produces `native32emu_libretro.dll` on Windows (`libnative32emu_libretro.so`
 on Linux, `libnative32emu_libretro.dylib` on macOS) under `target/release/`.
+
+For Android cross-compilation, see [Android Libretro Core](docs/Android-Libretro-Core.md).
 
 #### Distributing via RetroArch's Online Updater
 
