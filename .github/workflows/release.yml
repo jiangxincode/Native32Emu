@@ -110,9 +110,79 @@ jobs:
             ${{ matrix.artifact }}.*
             ${{ matrix.artifact }}-libretro.*
 
+  build-android:
+    name: Build libretro (Android)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Cache Rust artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          key: android
+
+      - name: Setup Android NDK
+        uses: nttld/setup-ndk@v1
+        id: setup-ndk
+        with:
+          ndk-version: r27c
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk --locked
+
+      - name: Build libretro core (all ABIs)
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: |
+          cargo ndk \
+            -t arm64-v8a -t armeabi-v7a -t x86 -t x86_64 \
+            -p 21 \
+            build -p native32emu-libretro --release
+
+      - name: Stage libretro core (Android)
+        shell: bash
+        run: |
+          # RetroArch on Android loads cores named <corename>_libretro_android.so,
+          # one per ABI directory (matching RetroArch's cores/<abi>/ layout).
+          declare -A ABI_TRIPLE=(
+            [arm64-v8a]=aarch64-linux-android
+            [armeabi-v7a]=armv7-linux-androideabi
+            [x86]=i686-linux-android
+            [x86_64]=x86_64-linux-android
+          )
+          for abi in "${!ABI_TRIPLE[@]}"; do
+            triple="${ABI_TRIPLE[$abi]}"
+            out="libretro/native32-emu-android/$abi"
+            mkdir -p "$out"
+            cp "target/$triple/release/libnative32emu_libretro.so" \
+               "$out/native32emu_libretro_android.so"
+          done
+          cp crates/native32emu-libretro/native32emu_libretro.info \
+             libretro/native32-emu-android/native32emu_libretro.info
+          ls -laR libretro/native32-emu-android
+
+      - name: Package libretro (Android)
+        shell: bash
+        run: |
+          cd libretro
+          tar czf ../native32-emu-android-libretro.tar.gz native32-emu-android
+          cd ..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: native32-emu-android
+          path: native32-emu-android-libretro.tar.gz
+
   release:
     name: Create Release
-    needs: build
+    needs: [build, build-android]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -141,6 +211,11 @@ jobs:
             ### libretro core (for RetroArch)
             - Files ending in `-libretro.*` contain `native32emu_libretro.<ext>`
               plus `native32emu_libretro.info`, ready to drop into RetroArch.
+
+            ### Android libretro core (for RetroArch on Android)
+            - `native32-emu-android-libretro.tar.gz` contains
+              `native32emu_libretro_android.so` for the `arm64-v8a`,
+              `armeabi-v7a`, `x86` and `x86_64` ABIs.
           files: artifacts/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

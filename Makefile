@@ -20,14 +20,43 @@ else
 	CARGO_PROFILE_FLAG :=
 endif
 
-# `platform` is set by the libretro CI templates: win64, win32, unix, osx.
-# `ARCH`/`arch` distinguish 32/64-bit and architecture variants.
+# `platform` is set by the libretro CI templates: win64, win32, unix, osx,
+# android. `ARCH`/`arch` distinguish 32/64-bit and architecture variants.
 platform ?=
 ARCH     ?=
 arch     ?=
 
+# Android requires a different build path: the NDK toolchain links against
+# Bionic, so we drive cargo through `cargo-ndk`. RetroArch on Android also
+# expects the core to be named `<corename>_libretro_android.so`.
+IS_ANDROID :=
+
+# Android API level to target (minimum supported). 21 covers Android 5.0+.
+ANDROID_API ?= 21
+
 # Map the libretro platform/arch to a Rust target triple and library naming.
-ifeq ($(platform),win64)
+ifeq ($(platform),android)
+	IS_ANDROID := 1
+	CORE_LIB   := $(TARGET)_android.so
+	CARGO_LIB  := lib$(TARGET).so
+	# `ARCH` selects the Android ABI; default to arm64-v8a.
+	ifeq ($(ARCH),arm)
+		RUST_TARGET := armv7-linux-androideabi
+		NDK_ABI     := armeabi-v7a
+	else ifeq ($(ARCH),arm64)
+		RUST_TARGET := aarch64-linux-android
+		NDK_ABI     := arm64-v8a
+	else ifeq ($(ARCH),x86)
+		RUST_TARGET := i686-linux-android
+		NDK_ABI     := x86
+	else ifeq ($(ARCH),x86_64)
+		RUST_TARGET := x86_64-linux-android
+		NDK_ABI     := x86_64
+	else
+		RUST_TARGET := aarch64-linux-android
+		NDK_ABI     := arm64-v8a
+	endif
+else ifeq ($(platform),win64)
 	RUST_TARGET := x86_64-pc-windows-gnu
 	CARGO_LIB   := $(TARGET).dll
 	CORE_LIB    := $(TARGET).dll
@@ -85,7 +114,13 @@ $(CORE_LIB):
 ifneq ($(RUST_TARGET),)
 	rustup target add $(RUST_TARGET) || true
 endif
+ifeq ($(IS_ANDROID),1)
+	# Android links against the NDK toolchain; cargo-ndk wires up the linker
+	# and sysroot for the selected ABI. Requires ANDROID_NDK_HOME to be set.
+	$(CARGO) ndk -t $(NDK_ABI) -p $(ANDROID_API) build -p native32emu-libretro $(CARGO_PROFILE_FLAG)
+else
 	$(CARGO) build -p native32emu-libretro $(CARGO_PROFILE_FLAG) $(CARGO_TARGET_FLAG)
+endif
 	cp -f "$(CARGO_OUT)" "$(CORE_LIB)"
 
 clean:
