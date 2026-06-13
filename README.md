@@ -131,6 +131,8 @@ Requires [Rust](https://www.rust-lang.org/tools/install) (stable).
 
 ```bash
 cargo build -p native32emu --release
+cargo run -p native32emu --release -- path/to/game.smf
+cargo run -p native32emu --release -- -f path/to/game.smf
 ```
 
 The binary is produced at `target/release/native32-emu`.
