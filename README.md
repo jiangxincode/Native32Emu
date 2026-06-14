@@ -21,6 +21,7 @@ Native32 is a game format developed by Sunplus for DVD player and TV chipsets (c
 - **Action bytecode VM** — 36 opcodes covering arithmetic, logic, string ops, control flow, sprites, and I/O
 - **Sprite/movie system** — animation, cloning, visibility control, depth-sorted rendering
 - **Audio playback** — MP3 music and raw 16-bit PCM sound effects
+- **MPEG-1 cutscenes** — pure-Rust MPEG-1 video + MP2 audio decoder plays `SSL_PlayNext` logo/cutscene videos (no C dependency); skippable with A/B
 - **Keyboard input** — configurable key remapping
 - **Save system** — `.ssl_sav` file persistence
 - **SSL multi-file content** — seamless switching between game levels/files
