@@ -49,11 +49,18 @@ native32-emu --remap "0x4000:space" game.smf
 # Fullscreen mode
 native32-emu --fullscreen game.smf
 
+# Tune keypad auto-repeat (affects mechanics like walk -> run)
+native32-emu --repeat-delay 10 --repeat-period 2 game.smf
+
 # Take a screenshot after 30 frames and exit
 native32-emu --screenshot screenshot.png --screenshot-frames 30 game.smf
 ```
 
 #### Command-line Options
+
+Common options are summarized below. For the full reference — including key
+remapping, the on-screen gamepad overlay, and keypad auto-repeat tuning — see
+[Command-line Options](docs/CLI-Options.md).
 
 | Option | Description | Default |
 |---|---|---|
@@ -63,8 +70,11 @@ native32-emu --screenshot screenshot.png --screenshot-frames 30 game.smf
 | `-v, --volume <0-100>` | Volume level (0 = mute, 100 = original) | `100` |
 | `-S, --screenshot <PATH>` | Take a screenshot and exit (saves as PNG) | — |
 | `--screenshot-frames <N>` | Frames to run before screenshot | `30` |
-| `--debug` | Enable debug/development mode | off |
 | `--remap <keycode:key>` | Remap a Native32 keycode to a physical key | — |
+| `--show-gamepad` | Show an on-screen virtual gamepad overlay | off |
+| `--repeat-delay <N>` | Frames a held key waits before auto-repeat (30fps) | `12` |
+| `--repeat-period <N>` | Frames between auto-repeat pulses (30fps) | `3` |
+| `--debug` | Enable debug/development mode | off |
 
 #### Default Key Mappings
 
