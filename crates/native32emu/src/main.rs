@@ -117,6 +117,10 @@ fn main() -> Result<()> {
     let key_remappings = cli.parse_key_remappings();
     emu.input.remap(&key_remappings);
 
+    // Apply typematic key-repeat timing (matches the hardware keypad driver).
+    emu.input
+        .set_repeat_timing(cli.repeat_delay, cli.repeat_period);
+
     let resolution = emu.reader.resolution;
     let display_width = resolution.0 * cli.scale;
     let display_height = resolution.1 * cli.scale;

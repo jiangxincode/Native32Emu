@@ -42,6 +42,17 @@ pub struct Cli {
     /// Show an on-screen virtual gamepad overlay
     #[arg(long)]
     pub show_gamepad: bool,
+
+    /// Frames a held key waits before auto-repeat starts (at 30fps).
+    /// Reproduces the hardware keypad's typematic delay; some games rely on it
+    /// (e.g. walk->run on a held direction). Default: 12 (~0.4s).
+    #[arg(long = "repeat-delay", default_value = "12")]
+    pub repeat_delay: u32,
+
+    /// Frames between auto-repeat pulses once a held key is repeating (at 30fps).
+    /// Default: 3 (~0.1s). Must be at least 1.
+    #[arg(long = "repeat-period", default_value = "3", value_parser = clap::value_parser!(u32).range(1..))]
+    pub repeat_period: u32,
 }
 
 impl Cli {

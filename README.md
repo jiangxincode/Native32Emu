@@ -33,49 +33,15 @@ Native32 is a game format developed by Sunplus for DVD player and TV chipsets (c
 
 Download the latest binary from the [Releases](https://github.com/jiangxincode/Native32Emu/releases) page.
 
+The basic usage is list below, but there are many more options for controlling the behavior of the emulator. See the [Command-line Options](docs/CLI-Options.md) documentation for the full list of options.
+
 ```bash
 # Basic usage
 native32-emu path/to/game.smf
 
-# With options
-native32-emu --scale 2 --volume 80 path/to/game.smf
-
-# 2x scaling with 50% volume
-native32-emu --scale 2 --volume 50 game.smf
-
-# Remap A button to Space
-native32-emu --remap "0x4000:space" game.smf
-
 # Fullscreen mode
 native32-emu --fullscreen game.smf
-
-# Take a screenshot after 30 frames and exit
-native32-emu --screenshot screenshot.png --screenshot-frames 30 game.smf
 ```
-
-#### Command-line Options
-
-| Option | Description | Default |
-|---|---|---|
-| `<GAME_PATH>` | Path to the game file (`.smf`, `.sgm`, or `.ssl`) | *required* |
-| `-s, --scale <1-16>` | Integer scaling factor | `1` |
-| `-f, --fullscreen` | Run in fullscreen mode | off |
-| `-v, --volume <0-100>` | Volume level (0 = mute, 100 = original) | `100` |
-| `-S, --screenshot <PATH>` | Take a screenshot and exit (saves as PNG) | — |
-| `--screenshot-frames <N>` | Frames to run before screenshot | `30` |
-| `--debug` | Enable debug/development mode | off |
-| `--remap <keycode:key>` | Remap a Native32 keycode to a physical key | — |
-
-#### Default Key Mappings
-
-| Native32 Keycode | Physical Key | Action |
-|---|---|---|
-| `0x0200` | ← Left | Left |
-| `0x0400` | → Right | Right |
-| `0x1c00` | ↑ Up | Up |
-| `0x1e00` | ↓ Down | Down |
-| `0x4000` | Z | A |
-| `0x8800` | X | B / Menu |
 
 ### RetroArch Mode
 
