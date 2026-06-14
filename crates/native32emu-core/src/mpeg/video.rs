@@ -1591,3 +1591,42 @@ fn idct(block: &mut [i32; 64]) {
         i += 8;
     }
 }
+
+impl Frame {
+    /// Convert this YCrCb frame to XRGB8888 and write it into `dst`, scaling
+    /// (nearest-neighbour) to `dst_w` x `dst_h`. `dst` must hold dst_w*dst_h u32.
+    /// Uses the BT.601 conversion (same coefficients as PL_MPEG).
+    pub fn write_rgb_scaled(&self, dst: &mut [u32], dst_w: usize, dst_h: usize) {
+        if dst_w == 0 || dst_h == 0 {
+            return;
+        }
+        let sw = self.width.max(1);
+        let sh = self.height.max(1);
+        let yw = self.y.width;
+        let cw = self.cr.width;
+
+        for ty in 0..dst_h {
+            let sy = (ty * sh / dst_h).min(sh - 1);
+            let y_row = sy * yw;
+            let c_row = (sy / 2) * cw;
+            let d_row = ty * dst_w;
+            for tx in 0..dst_w {
+                let sx = (tx * sw / dst_w).min(sw - 1);
+                let yv = self.y.data[y_row + sx] as i32;
+                let ci = c_row + (sx / 2);
+                let cr = self.cr.data[ci] as i32 - 128;
+                let cb = self.cb.data[ci] as i32 - 128;
+
+                let yy = ((yv - 16) * 76309) >> 16;
+                let r = (cr * 104597) >> 16;
+                let g = (cb * 25674 + cr * 53278) >> 16;
+                let b = (cb * 132201) >> 16;
+
+                let rr = clamp_u8(yy + r) as u32;
+                let gg = clamp_u8(yy - g) as u32;
+                let bb = clamp_u8(yy + b) as u32;
+                dst[d_row + tx] = 0xFF00_0000 | (rr << 16) | (gg << 8) | bb;
+            }
+        }
+    }
+}

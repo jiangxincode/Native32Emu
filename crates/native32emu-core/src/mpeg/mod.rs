@@ -13,8 +13,10 @@
 pub mod audio;
 pub mod buffer;
 pub mod demux;
+pub mod player;
 pub mod video;
 
 pub use audio::{Audio, Samples};
 pub use demux::{demux_all, DemuxedStreams};
+pub use player::VideoPlayer;
 pub use video::{Frame, Plane, Video};

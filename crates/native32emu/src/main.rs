@@ -171,7 +171,14 @@ fn main() -> Result<()> {
         // Feed keyboard state into the shared core, then run button actions
         let pressed = emu.input.get_pressed_keycodes(&window);
         emu.set_buttons(&pressed);
-        emu.handle_buttons();
+        if emu.is_cutscene_active() {
+            // Allow skipping logo/cutscene videos with the A or B button.
+            if pressed.contains(&0x4000) || pressed.contains(&0x8800) {
+                emu.skip_cutscene();
+            }
+        } else {
+            emu.handle_buttons();
+        }
 
         // Tick emulation (handles content switching internally)
         emu.tick();

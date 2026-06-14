@@ -214,8 +214,15 @@ pub extern "C" fn retro_run() {
         let buttons = query_joypad_buttons(0);
         emu.set_buttons(&buttons);
 
-        // 3. Handle button events (frame-based actions)
-        emu.handle_buttons();
+        // 3. Handle button events. During a cutscene, suppress game input and
+        // allow the A or B button to skip the logo/cutscene videos instead.
+        if emu.is_cutscene_active() {
+            if buttons.contains(&NATIVE32_KEY_A) || buttons.contains(&NATIVE32_KEY_B) {
+                emu.skip_cutscene();
+            }
+        } else {
+            emu.handle_buttons();
+        }
 
         // 4. Execute one tick of emulation
         emu.tick();
