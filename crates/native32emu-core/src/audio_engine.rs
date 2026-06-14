@@ -299,6 +299,58 @@ impl AudioEngine {
         }
     }
 
+    /// Play a fully-decoded interleaved PCM stream (used for cutscene audio).
+    /// `samples` are normalized floats interleaved by `channels`.
+    #[cfg(feature = "standalone")]
+    pub fn play_pcm_stream(&mut self, samples: Vec<f32>, channels: u16, sample_rate: u32) {
+        if samples.is_empty() || channels == 0 || sample_rate == 0 {
+            return;
+        }
+        if let Some(ref mixer) = self.mixer {
+            if let Some(ref player) = self.player {
+                player.stop();
+            }
+            let source = rodio::buffer::SamplesBuffer::new(
+                NonZero::<u16>::new(channels).unwrap(),
+                NonZero::<u32>::new(sample_rate).unwrap(),
+                samples,
+            );
+            let player = rodio::Player::connect_new(mixer);
+            player.set_volume(self.volume);
+            player.append(source);
+            self.player = Some(player);
+            self.music_owner = Some("__cutscene__".to_string());
+        }
+    }
+
+    /// Libretro variant: resample to the engine's output rate and stage the
+    /// samples for `get_pending_samples` to drain.
+    #[cfg(not(feature = "standalone"))]
+    pub fn play_pcm_stream(&mut self, samples: Vec<f32>, channels: u16, sample_rate: u32) {
+        if samples.is_empty() || channels == 0 || sample_rate == 0 {
+            return;
+        }
+        let out_rate = match self.colorspace {
+            Colorspace::YUV => 11025u32,
+            Colorspace::ARGB => 22050u32,
+        };
+        let ch = channels as usize;
+        let in_frames = samples.len() / ch;
+        let out_frames = (in_frames as u64 * out_rate as u64 / sample_rate as u64) as usize;
+        let mut out = Vec::with_capacity(out_frames * 2);
+        for i in 0..out_frames {
+            let src =
+                ((i as u64 * sample_rate as u64 / out_rate as u64) as usize).min(in_frames - 1);
+            let base = src * ch;
+            let l = samples[base];
+            let r = if ch >= 2 { samples[base + 1] } else { l };
+            out.push((l * 32767.0 * self.volume).clamp(-32768.0, 32767.0) as i16);
+            out.push((r * 32767.0 * self.volume).clamp(-32768.0, 32767.0) as i16);
+        }
+        self.pending_samples = out;
+        self.tone_active = false;
+    }
+
     /// Stop all currently playing sounds.
     pub fn stop_all(&mut self) {
         #[cfg(feature = "standalone")]

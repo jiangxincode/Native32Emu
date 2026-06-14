@@ -22,6 +22,7 @@ pub mod frame_player;
 pub mod header_decryptor;
 pub mod image_decoder;
 pub mod input_handler;
+pub mod mpeg;
 pub mod renderer;
 pub mod save_manager;
 pub mod sprite_system;

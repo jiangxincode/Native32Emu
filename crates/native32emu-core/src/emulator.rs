@@ -33,6 +33,11 @@ pub struct Emulator {
     pub cur_frame_objects: Vec<FrameObject>,
     pub tick_count: u64,
     pub time_ms: u32,
+    /// MPEG-1 cutscene videos queued by SSL_PlayNext, played before the next
+    /// SSL content loads.
+    pub pending_videos: Vec<String>,
+    /// Active cutscene player, if a video is currently playing.
+    pub video_player: Option<crate::mpeg::VideoPlayer>,
 }
 
 impl Emulator {
@@ -63,6 +68,8 @@ impl Emulator {
             cur_frame_objects: Vec::new(),
             tick_count: 0,
             time_ms: 0,
+            pending_videos: Vec::new(),
+            video_player: None,
         })
     }
 
@@ -98,6 +105,13 @@ impl Emulator {
     /// Run one tick of the emulation (called at 30fps).
     pub fn tick(&mut self) {
         self.tick_count += 1;
+
+        // While a cutscene is playing (or queued), drive video playback instead
+        // of the normal timeline.
+        if self.is_cutscene_active() {
+            self.cutscene_tick();
+            return;
+        }
 
         // Advance main timeline
         self.frame_player.tick();
@@ -220,11 +234,110 @@ impl Emulator {
         }
 
         // Handle content switching (SSL_PlayNext)
-        if self.content_loader.has_pending() {
+        if self.content_loader.has_pending() && !self.is_cutscene_active() {
             if let Some(filename) = self.content_loader.take_pending() {
                 if let Err(e) = self.switch_content(&filename) {
                     log::error!("Failed to switch content: {}", e);
                 }
+            }
+        }
+    }
+
+    /// Whether a cutscene video is currently playing or queued.
+    pub fn is_cutscene_active(&self) -> bool {
+        self.video_player.is_some() || !self.pending_videos.is_empty()
+    }
+
+    /// Queue MPEG-1 cutscene videos (SSL_PlayNext pre-content) for playback.
+    pub fn queue_videos(&mut self, names: &[&str]) {
+        for name in names {
+            let normalized = normalize_content_path(name);
+            if !normalized.is_empty() {
+                self.pending_videos.push(normalized);
+            }
+        }
+    }
+
+    /// Skip the current (and any queued) cutscene videos.
+    pub fn skip_cutscene(&mut self) {
+        self.pending_videos.clear();
+        self.video_player = None;
+        self.audio.stop_all();
+    }
+
+    /// Advance cutscene playback by one 30fps tick.
+    fn cutscene_tick(&mut self) {
+        // Load the next queued video if none is playing.
+        if self.video_player.is_none() {
+            if self.pending_videos.is_empty() {
+                return;
+            }
+            let name = self.pending_videos.remove(0);
+            if !self.start_video(&name) {
+                // Could not start this one; the next tick tries the next entry
+                // (or finishes the cutscene and loads the SSL content).
+                return;
+            }
+        }
+
+        let (w, h) = (self.renderer.width as usize, self.renderer.height as usize);
+        if let Some(player) = self.video_player.as_mut() {
+            player.advance_and_render(1.0 / 30.0, &mut self.renderer.buffer, w, h);
+            if player.is_finished() {
+                self.video_player = None;
+                self.audio.stop_all();
+            }
+        }
+    }
+
+    /// Resolve, load and start a cutscene video. Returns false on any failure
+    /// (missing file, bad data) so the caller can fall through.
+    fn start_video(&mut self, name: &str) -> bool {
+        let path = match ContentLoader::find_content_file(&self.filename, name) {
+            Some(p) => p,
+            None => {
+                log::warn!("Cutscene video not found: {}", name);
+                return false;
+            }
+        };
+        log::info!("Playing cutscene: {}", path.display());
+
+        let data = match std::fs::read(&path) {
+            Ok(d) => d,
+            Err(e) => {
+                log::warn!("Failed to read cutscene {}: {}", path.display(), e);
+                return false;
+            }
+        };
+
+        let streams = crate::mpeg::demux_all(data);
+        if streams.video.is_empty() {
+            log::warn!("Cutscene has no video stream: {}", path.display());
+            return false;
+        }
+
+        // Decode and start the audio track up front (if present).
+        if !streams.audio.is_empty() {
+            let mut audio = crate::mpeg::Audio::new(streams.audio);
+            if audio.has_header() {
+                let rate = audio.samplerate();
+                let mut pcm: Vec<f32> = Vec::new();
+                while let Some(s) = audio.decode() {
+                    pcm.extend_from_slice(&s.interleaved);
+                }
+                self.audio.stop_all();
+                self.audio.play_pcm_stream(pcm, 2, rate);
+            }
+        }
+
+        match crate::mpeg::VideoPlayer::new(streams.video) {
+            Some(player) => {
+                self.video_player = Some(player);
+                true
+            }
+            None => {
+                log::warn!("Cutscene video has no sequence header: {}", path.display());
+                false
             }
         }
     }
@@ -263,6 +376,10 @@ impl Emulator {
 
     /// Draw the current frame to the renderer's buffer.
     pub fn draw(&mut self) {
+        // During a cutscene the framebuffer is produced by the video player.
+        if self.is_cutscene_active() {
+            return;
+        }
         self.renderer
             .draw_frame(&mut self.reader, &self.sprites, &self.cur_frame_objects);
     }
@@ -497,8 +614,11 @@ impl VmHost for Emulator {
             "SSL_PlayNext" => {
                 log::info!("SSL_PlayNext({}, {})", url, target);
                 let url_parts: Vec<&str> = url.split('+').collect();
-                for skipped in &url_parts[..url_parts.len().saturating_sub(1)] {
-                    log::info!("Ignoring SSL_PlayNext pre-content: {}", skipped);
+                // All parts except the last are MPEG-1 pre-content (logo /
+                // cutscene videos) to play before loading the final SSL content.
+                if url_parts.len() > 1 {
+                    let pre = &url_parts[..url_parts.len() - 1];
+                    self.queue_videos(pre);
                 }
                 if let Some(last) = url_parts.last() {
                     self.content_loader.queue_load(last);
@@ -582,4 +702,15 @@ fn str_to_float(s: &str) -> f64 {
         return 0.0;
     }
     s.parse::<f64>().unwrap_or(0.0)
+}
+
+/// Normalize a Native32 content path: split on '/', trim each component
+/// (games pad directory names with trailing spaces), drop empties, rejoin.
+fn normalize_content_path(filename: &str) -> String {
+    filename
+        .split('/')
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>()
+        .join("/")
 }
