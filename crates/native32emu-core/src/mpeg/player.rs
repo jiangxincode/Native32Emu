@@ -7,10 +7,10 @@ use super::video::Video;
 pub struct VideoPlayer {
     video: Video,
     framerate: f64,
-    /// Current playback time, in seconds.
+    /// Current playback time, in seconds (accumulator, not a loop counter).
     time: f64,
-    /// Time at which the next frame should be decoded.
-    next_decode_time: f64,
+    /// Number of frames decoded/shown so far (drives the decode loop).
+    frames_shown: u64,
     /// Index of the most recently decoded displayable frame.
     cur_frame: Option<usize>,
     finished: bool,
@@ -33,7 +33,7 @@ impl VideoPlayer {
             video,
             framerate,
             time: 0.0,
-            next_decode_time: 0.0,
+            frames_shown: 0,
             cur_frame: None,
             finished: false,
         })
@@ -48,11 +48,14 @@ impl VideoPlayer {
     pub fn advance_and_render(&mut self, dt: f64, dst: &mut [u32], dst_w: usize, dst_h: usize) {
         if !self.finished {
             self.time += dt;
-            while self.time >= self.next_decode_time {
+            // Number of frames that should have been shown by `time`. Decoding
+            // is driven by this integer target, not a floating-point counter.
+            let target = (self.time * self.framerate) as u64;
+            while self.frames_shown <= target {
                 match self.video.decode() {
                     Some(idx) => {
                         self.cur_frame = Some(idx);
-                        self.next_decode_time += 1.0 / self.framerate;
+                        self.frames_shown += 1;
                     }
                     None => {
                         self.finished = true;
