@@ -12,5 +12,7 @@
 
 pub mod buffer;
 pub mod demux;
+pub mod video;
 
 pub use demux::{demux_all, DemuxedStreams};
+pub use video::{Frame, Plane, Video};

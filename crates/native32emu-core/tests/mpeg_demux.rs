@@ -97,3 +97,39 @@ fn demux_real_cutscene_splits_streams() {
         "audio stream should not be empty"
     );
 }
+
+#[test]
+#[ignore = "requires non-distributed .mpg assets"]
+fn decode_real_cutscene_video_frames() {
+    let Some(path) = find_mpg() else {
+        eprintln!("No .mpg assets found; skipping.");
+        return;
+    };
+    eprintln!("Decoding video from {}", path.display());
+
+    let data = std::fs::read(&path).expect("read mpg");
+    let streams = mpeg::demux_all(data);
+
+    let mut video = mpeg::Video::new(streams.video);
+    assert!(video.has_header(), "should parse sequence header");
+    let (w, h) = (video.width(), video.height());
+    eprintln!("video {}x{} @ {:.3} fps", w, h, video.framerate());
+    assert!(w > 0 && h > 0, "sane dimensions");
+
+    // Decode several frames and confirm at least one is non-blank.
+    let mut frames = 0u32;
+    let mut non_blank = false;
+    while frames < 30 {
+        let Some(idx) = video.decode() else { break };
+        let frame = video.frame(idx);
+        assert_eq!(frame.width, w);
+        assert_eq!(frame.height, h);
+        if frame.y.data.iter().any(|&p| p != 0) {
+            non_blank = true;
+        }
+        frames += 1;
+    }
+    eprintln!("decoded {frames} frames, non_blank={non_blank}");
+    assert!(frames > 0, "should decode at least one frame");
+    assert!(non_blank, "decoded frames should not be entirely blank");
+}

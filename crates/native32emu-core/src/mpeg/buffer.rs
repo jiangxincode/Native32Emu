@@ -5,21 +5,6 @@
 // the whole stream is held in a single buffer, so there is no ring buffer,
 // load callbacks or partial-data handling.
 
-/// VLC decode table entry. `index` > 0 points to the next node; `index` <= 0
-/// terminates and `value` is the decoded symbol.
-#[derive(Clone, Copy)]
-pub struct Vlc {
-    pub index: i16,
-    pub value: i16,
-}
-
-/// VLC decode table entry with an unsigned value.
-#[derive(Clone, Copy)]
-pub struct VlcUint {
-    pub index: i16,
-    pub value: u16,
-}
-
 /// A bit reader over an owned byte buffer.
 pub struct Buffer {
     bytes: Vec<u8>,
@@ -148,32 +133,47 @@ impl Buffer {
         self.bytes.get(start..start + count)
     }
 
-    /// Decode a value using a binary VLC table (PL_MPEG layout).
-    pub fn read_vlc(&mut self, table: &[Vlc]) -> i16 {
-        let mut state = Vlc { index: 0, value: 0 };
+    /// Decode a value using a binary VLC table (PL_MPEG layout). Each entry is
+    /// `(index, value)`; a positive `index` points to the next node (`index +
+    /// bit`), `index <= 0` terminates with `value`.
+    pub fn read_vlc(&mut self, table: &[(i16, i16)]) -> i16 {
+        let mut index: i16 = 0;
         loop {
             let bit = self.read(1) as i16;
-            state = table[(state.index + bit) as usize];
-            if state.index <= 0 {
-                break;
+            let (next, value) = table[(index + bit) as usize];
+            if next <= 0 {
+                return value;
             }
+            index = next;
         }
-        state.value
     }
 
     /// Decode a value using an unsigned binary VLC table.
-    pub fn read_vlc_uint(&mut self, table: &[VlcUint]) -> u16 {
-        let mut state = VlcUint { index: 0, value: 0 };
+    pub fn read_vlc_uint(&mut self, table: &[(i16, u16)]) -> u16 {
+        let mut index: i16 = 0;
         loop {
             let bit = self.read(1) as i16;
-            let e = table[(state.index + bit) as usize];
-            state = e;
-            if state.index <= 0 {
-                break;
+            let (next, value) = table[(index + bit) as usize];
+            if next <= 0 {
+                return value;
             }
+            index = next;
         }
-        state.value
     }
+
+    /// Peek `bit_count` bits without consuming them; return whether non-zero.
+    pub fn peek_non_zero(&mut self, bit_count: usize) -> bool {
+        if !self.has(bit_count) {
+            return false;
+        }
+        let saved = self.bit_index;
+        let val = self.read(bit_count);
+        self.bit_index = saved;
+        val != 0
+    }
+
+    /// No-op for the in-memory buffer (kept for PL_MPEG API parity).
+    pub fn discard_read_bytes(&mut self) {}
 }
 
 #[cfg(test)]
