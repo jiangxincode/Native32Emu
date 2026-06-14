@@ -1,0 +1,99 @@
+//! Integration test for the MPEG-PS demuxer against a real cutscene file.
+//!
+//! Needs the (non-distributed) game assets, so it is `#[ignore]`d and run on
+//! demand:
+//!
+//! ```text
+//! cargo test -p native32emu-core --test mpeg_demux -- --ignored --nocapture
+//! ```
+//!
+//! Looks for the video under `<repo>/native32_game` by default, or override
+//! the game root with the `NATIVE32_GAME_DIR` environment variable.
+
+use std::path::PathBuf;
+
+use native32emu_core::mpeg;
+
+fn game_dir() -> Option<PathBuf> {
+    if let Ok(dir) = std::env::var("NATIVE32_GAME_DIR") {
+        let p = PathBuf::from(dir);
+        return p.is_dir().then_some(p);
+    }
+    let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|root| root.join("native32_game"))
+        .filter(|p| p.is_dir())
+}
+
+/// Find a `.mpg` cutscene, trying the known METAL path first then any `.mpg`.
+fn find_mpg() -> Option<PathBuf> {
+    let root = game_dir()?;
+    let known = root.join("NA32SSL/ENGLISH/METAL/MSCG1.mpg");
+    if known.is_file() {
+        return Some(known);
+    }
+    // Fall back to a recursive scan for any .mpg.
+    fn scan(dir: &std::path::Path) -> Option<PathBuf> {
+        for entry in std::fs::read_dir(dir).ok()?.flatten() {
+            let p = entry.path();
+            if p.is_dir() {
+                if let Some(found) = scan(&p) {
+                    return Some(found);
+                }
+            } else if p.extension().is_some_and(|e| e.eq_ignore_ascii_case("mpg")) {
+                return Some(p);
+            }
+        }
+        None
+    }
+    scan(&root)
+}
+
+#[test]
+#[ignore = "requires non-distributed .mpg assets"]
+fn demux_real_cutscene_splits_streams() {
+    let Some(path) = find_mpg() else {
+        eprintln!("No .mpg assets found; skipping.");
+        return;
+    };
+    eprintln!("Demuxing {}", path.display());
+
+    let data = std::fs::read(&path).expect("read mpg");
+    let streams = mpeg::demux_all(data);
+
+    eprintln!(
+        "video stream: {} bytes, audio stream: {} bytes (declared video={}, audio={})",
+        streams.video.len(),
+        streams.audio.len(),
+        streams.num_video_streams,
+        streams.num_audio_streams,
+    );
+
+    // The video elementary stream must be present and begin with an MPEG-1
+    // sequence header start code (00 00 01 B3).
+    assert!(
+        !streams.video.is_empty(),
+        "video stream should not be empty"
+    );
+    let seq = streams
+        .video
+        .windows(4)
+        .position(|w| w == [0x00, 0x00, 0x01, 0xB3]);
+    assert!(
+        seq.is_some(),
+        "video stream should contain a sequence header (00 00 01 B3)"
+    );
+    assert_eq!(
+        seq,
+        Some(0),
+        "video stream should start with the sequence header"
+    );
+
+    // These cutscenes carry an MP2 audio track.
+    assert!(
+        !streams.audio.is_empty(),
+        "audio stream should not be empty"
+    );
+}
