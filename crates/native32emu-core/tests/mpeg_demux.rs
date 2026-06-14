@@ -133,3 +133,40 @@ fn decode_real_cutscene_video_frames() {
     assert!(frames > 0, "should decode at least one frame");
     assert!(non_blank, "decoded frames should not be entirely blank");
 }
+
+#[test]
+#[ignore = "requires non-distributed .mpg assets"]
+fn decode_real_cutscene_audio_frames() {
+    let Some(path) = find_mpg() else {
+        eprintln!("No .mpg assets found; skipping.");
+        return;
+    };
+    eprintln!("Decoding audio from {}", path.display());
+
+    let data = std::fs::read(&path).expect("read mpg");
+    let streams = mpeg::demux_all(data);
+
+    let mut audio = mpeg::Audio::new(streams.audio);
+    assert!(audio.has_header(), "should parse an MP2 frame header");
+    let sr = audio.samplerate();
+    eprintln!("audio samplerate = {sr} Hz");
+    assert!(
+        [44100, 48000, 32000, 22050, 24000, 16000].contains(&sr),
+        "samplerate should be a valid MPEG audio rate"
+    );
+
+    let mut frames = 0u32;
+    let mut peak = 0.0f32;
+    while frames < 50 {
+        let Some(s) = audio.decode() else { break };
+        assert_eq!(s.interleaved.len(), 1152 * 2);
+        for &v in &s.interleaved {
+            assert!(v.is_finite(), "samples must be finite");
+            peak = peak.max(v.abs());
+        }
+        frames += 1;
+    }
+    eprintln!("decoded {frames} audio frames, peak amplitude = {peak:.4}");
+    assert!(frames > 0, "should decode at least one audio frame");
+    assert!(peak > 0.0, "decoded audio should not be pure silence");
+}

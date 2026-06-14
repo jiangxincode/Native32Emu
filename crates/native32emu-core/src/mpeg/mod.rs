@@ -10,9 +10,11 @@
 //   - video:  MPEG-1 video decoder (TODO)
 //   - audio:  MP2 audio decoder (TODO)
 
+pub mod audio;
 pub mod buffer;
 pub mod demux;
 pub mod video;
 
+pub use audio::{Audio, Samples};
 pub use demux::{demux_all, DemuxedStreams};
 pub use video::{Frame, Plane, Video};

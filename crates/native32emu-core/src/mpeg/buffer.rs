@@ -174,6 +174,24 @@ impl Buffer {
 
     /// No-op for the in-memory buffer (kept for PL_MPEG API parity).
     pub fn discard_read_bytes(&mut self) {}
+
+    /// Scan for an MP2 frame sync word (0xFF followed by a byte whose top 7
+    /// bits are set: `(b & 0xFE) == 0xFC`). On success positions the read head
+    /// just past the 11-bit sync and returns true; otherwise advances to the
+    /// end and returns false. Mirrors PL_MPEG's `plm_audio_find_frame_sync`.
+    pub fn find_frame_sync(&mut self) -> bool {
+        let mut i = self.bit_index >> 3;
+        let last = self.bytes.len().saturating_sub(1);
+        while i < last {
+            if self.bytes[i] == 0xFF && (self.bytes[i + 1] & 0xFE) == 0xFC {
+                self.bit_index = ((i + 1) << 3) + 3;
+                return true;
+            }
+            i += 1;
+        }
+        self.bit_index = (i + 1) << 3;
+        false
+    }
 }
 
 #[cfg(test)]
