@@ -7,7 +7,7 @@
 //! cargo test -p native32emu-core --test mpeg_demux -- --ignored --nocapture
 //! ```
 //!
-//! Looks for the video under `<repo>/native32_game` by default, or override
+//! Looks for the video under `<repo>/tmp/native32_game` by default, or override
 //! the game root with the `NATIVE32_GAME_DIR` environment variable.
 
 use std::path::PathBuf;
@@ -23,7 +23,7 @@ fn game_dir() -> Option<PathBuf> {
     manifest
         .parent()
         .and_then(|p| p.parent())
-        .map(|root| root.join("native32_game"))
+        .map(|root| root.join("tmp").join("native32_game"))
         .filter(|p| p.is_dir())
 }
 

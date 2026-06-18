@@ -8,7 +8,7 @@
 //! cargo test -p native32emu-core --test smoke -- --ignored --nocapture
 //! ```
 //!
-//! By default it looks for games in `<repo>/native32_game`. Override the
+//! By default it looks for games in `<repo>/tmp/native32_game`. Override the
 //! location with the `NATIVE32_GAME_DIR` environment variable.
 
 use std::path::{Path, PathBuf};
@@ -24,13 +24,13 @@ fn game_dir() -> Option<PathBuf> {
         let p = PathBuf::from(dir);
         return p.is_dir().then_some(p);
     }
-    // Default: <workspace_root>/native32_game. CARGO_MANIFEST_DIR points at the
+    // Default: <workspace_root>/tmp/native32_game. CARGO_MANIFEST_DIR points at the
     // core crate (crates/native32emu-core), so go up two levels.
     let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let candidate = manifest
         .parent()
         .and_then(|p| p.parent())
-        .map(|root| root.join("native32_game"));
+        .map(|root| root.join("tmp").join("native32_game"));
     candidate.filter(|p| p.is_dir())
 }
 

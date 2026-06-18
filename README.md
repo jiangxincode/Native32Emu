@@ -154,7 +154,7 @@ frame. It needs the (non-distributed) game assets, so it is `#[ignore]`d by
 default and run on demand:
 
 ```bash
-# Uses <repo>/native32_game by default, or set NATIVE32_GAME_DIR
+# Uses <repo>/tmp/native32_game by default, or set NATIVE32_GAME_DIR
 cargo test -p native32emu-core --test smoke -- --ignored --nocapture
 ```
 

@@ -33,7 +33,7 @@ Native32 是一个嵌入式/电视游戏平台，其游戏资源由 **YUV Gamema
 ## 目录结构
 
 ```
-native32_game/
+tmp/native32_game/
 ├── FHUI.smf                    # 主前端界面/游戏启动器
 ├── EACT/                       # 动作游戏分类
 │   ├── EBBLADE.smf             # 赤刃（跳板文件）

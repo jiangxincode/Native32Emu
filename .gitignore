@@ -1,5 +1,4 @@
-native32_game/
-third_party/
+tmp/
 .kiro/
 target/
 .codegraph/

@@ -21,7 +21,7 @@ fn game_dir() -> Option<PathBuf> {
     manifest
         .parent()
         .and_then(|p| p.parent())
-        .map(|root| root.join("native32_game"))
+        .map(|root| root.join("tmp").join("native32_game"))
         .filter(|p| p.is_dir())
 }
 
