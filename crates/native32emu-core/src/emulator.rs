@@ -429,8 +429,21 @@ impl Emulator {
 
         match crate::dat_loader::decode_image(&data, self.reader.colorspace, which) {
             Some(img) => {
+                // Tie the thumbnail's visibility to its owning menu panel so it
+                // hides when the view switches: the list-item name banners
+                // (gName*) follow the list panel (listA0), the info preview
+                // (gInfo) follows the info panel (infoA0). Without this the
+                // flat sprite model keeps these always-visible overrides on
+                // screen across a list <-> info switch.
+                let visibility_leader = if sprite_name.starts_with("gName") {
+                    Some("listA0".to_string())
+                } else if sprite_name.starts_with("gInfo") {
+                    Some("infoA0".to_string())
+                } else {
+                    None
+                };
                 self.renderer
-                    .set_sprite_override(sprite_name.to_string(), img);
+                    .set_sprite_override(sprite_name.to_string(), img, visibility_leader);
             }
             None => log::debug!("LoadImage: could not decode image '{}'", pic_path),
         }

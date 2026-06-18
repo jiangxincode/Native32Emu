@@ -21,6 +21,18 @@ pub struct DrawEntry {
     pub depth: u32,
 }
 
+/// A runtime image override bound to a menu sprite.
+struct SpriteOverride {
+    image: RgbaImage,
+    /// Optional "visibility leader" sprite. When set, the override is only
+    /// drawn if that sprite exists and is currently visible. This models the
+    /// FHUI menu's panel parent-child visibility: the list-item name banners
+    /// follow the list panel, the info preview follows the info panel, so each
+    /// thumbnail hides together with its owning view instead of lingering when
+    /// the view switches.
+    visibility_leader: Option<String>,
+}
+
 pub struct Renderer {
     pub screen_x: i32,
     pub screen_y: i32,
@@ -29,7 +41,7 @@ pub struct Renderer {
     pub height: u32,
     /// Runtime image overrides keyed by sprite name (front-end menu thumbnails
     /// loaded from `.dat` files via the LoadImage host call).
-    sprite_overrides: HashMap<String, RgbaImage>,
+    sprite_overrides: HashMap<String, SpriteOverride>,
 }
 
 impl Renderer {
@@ -45,9 +57,21 @@ impl Renderer {
     }
 
     /// Bind a decoded image to a sprite name so it is drawn in place of the
-    /// sprite's normal movie-frame image.
-    pub fn set_sprite_override(&mut self, name: String, image: RgbaImage) {
-        self.sprite_overrides.insert(name, image);
+    /// sprite's normal movie-frame image. `visibility_leader` optionally ties
+    /// the override's visibility to another sprite (the owning menu panel).
+    pub fn set_sprite_override(
+        &mut self,
+        name: String,
+        image: RgbaImage,
+        visibility_leader: Option<String>,
+    ) {
+        self.sprite_overrides.insert(
+            name,
+            SpriteOverride {
+                image,
+                visibility_leader,
+            },
+        );
     }
 
     /// Drop all sprite image overrides (e.g. when switching content).
@@ -101,7 +125,18 @@ impl Renderer {
             }
             // A runtime override (menu thumbnail) takes precedence over the
             // sprite's normal movie-frame image.
-            if self.sprite_overrides.contains_key(name) {
+            if let Some(ovr) = self.sprite_overrides.get(name) {
+                // Hide the thumbnail together with its owning panel: if a
+                // visibility leader is set and that panel sprite is currently
+                // hidden, skip this override so it does not linger across a
+                // list <-> info view switch.
+                if let Some(leader) = &ovr.visibility_leader {
+                    if let Some(panel) = sprites.get(leader) {
+                        if !panel.visible {
+                            continue;
+                        }
+                    }
+                }
                 let (fx, fy) = {
                     let movie_frames = reader.get_movie(movie.movie);
                     movie_frames
@@ -143,7 +178,7 @@ impl Renderer {
                     }
                 }
                 DrawSource::Override(name) => {
-                    if let Some(img) = self.sprite_overrides.get(name).cloned() {
+                    if let Some(img) = self.sprite_overrides.get(name).map(|o| o.image.clone()) {
                         self.blit_image(&img, x, y);
                     }
                 }
@@ -188,5 +223,65 @@ impl Renderer {
         }
         img.save(path)?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::file_loader::Native32Reader;
+    use crate::sprite_system::{MovieState, SpriteSystem};
+
+    // Build a renderer with a single 1x1 opaque-red override bound to `sprite`,
+    // optionally following `leader`. The override sprite is visible; `leader`
+    // (if present) is created with the given visibility.
+    fn setup(
+        leader: Option<&str>,
+        leader_visible: bool,
+    ) -> (Renderer, Native32Reader, SpriteSystem) {
+        let mut renderer = Renderer::new(4, 4);
+        let img = RgbaImage {
+            width: 1,
+            height: 1,
+            pixels: vec![0xFFFF0000],
+        };
+        renderer.set_sprite_override("gName0".to_string(), img, leader.map(|s| s.to_string()));
+
+        let reader = Native32Reader::new(Vec::new());
+
+        let mut sprites = SpriteSystem::new();
+        // movie index 1 so the empty reader safely returns no frames.
+        sprites.insert("gName0".to_string(), MovieState::new(1, 0, 0, 17));
+        if let Some(name) = leader {
+            let mut panel = MovieState::new(1, 0, 0, 15);
+            panel.visible = leader_visible;
+            sprites.insert(name.to_string(), panel);
+        }
+        (renderer, reader, sprites)
+    }
+
+    #[test]
+    fn override_drawn_when_leader_visible() {
+        let (mut renderer, mut reader, sprites) = setup(Some("listA0"), true);
+        renderer.draw_frame(&mut reader, &sprites, &[]);
+        assert_eq!(renderer.buffer[0], 0xFFFF0000, "override should be drawn");
+    }
+
+    #[test]
+    fn override_hidden_when_leader_hidden() {
+        let (mut renderer, mut reader, sprites) = setup(Some("listA0"), false);
+        renderer.draw_frame(&mut reader, &sprites, &[]);
+        assert_eq!(
+            renderer.buffer[0], 0xFF000000,
+            "override should be skipped while its panel is hidden"
+        );
+    }
+
+    #[test]
+    fn override_drawn_without_leader() {
+        // No visibility leader: the override always draws (legacy behaviour).
+        let (mut renderer, mut reader, sprites) = setup(None, false);
+        renderer.draw_frame(&mut reader, &sprites, &[]);
+        assert_eq!(renderer.buffer[0], 0xFFFF0000);
     }
 }
