@@ -244,3 +244,115 @@ fn gunfire_menu_advances_on_confirm() {
          (selection animation appears frozen)"
     );
 }
+
+/// Regression test for the front-end menu game list: the FHUI shell enumerates
+/// the games on disk via the GetFileNum / GetFirstFile / GetNextFile host calls
+/// and loads each game's `.dat` thumbnail. Previously these calls were ignored,
+/// so the menu showed an empty game list. We drive the menu into the first
+/// category and assert the list is populated and thumbnails are bound.
+#[test]
+#[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
+fn fhui_menu_populates_game_list() {
+    let dir = match game_dir() {
+        Some(d) => d,
+        None => {
+            eprintln!("skipping: no game directory found (set NATIVE32_GAME_DIR)");
+            return;
+        }
+    };
+    let menu = match find_asset(&dir, "FHUI.smf") {
+        Some(p) => p,
+        None => {
+            eprintln!("skipping: FHUI.smf not found under {}", dir.display());
+            return;
+        }
+    };
+
+    // Warm up, then tap confirm once to enter the first category's game grid.
+    let emu = run_scripted(&menu, 160, |frame| {
+        if (50..53).contains(&frame) {
+            vec![KEY_Z]
+        } else {
+            vec![]
+        }
+    })
+    .expect("run FHUI menu");
+
+    // We should still be in the menu (not have launched a game yet).
+    let name = emu
+        .filename
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+    assert!(
+        name.eq_ignore_ascii_case("FHUI.smf"),
+        "expected to remain in the menu, but loaded {name}"
+    );
+
+    // The per-category game counts must be populated (EPOP is the first tab).
+    let epop_count = emu
+        .vm
+        .vars
+        .get("tfilenum0")
+        .and_then(|v| v.parse::<u32>().ok())
+        .unwrap_or(0);
+    assert!(
+        epop_count > 0,
+        "menu game count not populated (tfilenum0 = {:?})",
+        emu.vm.vars.get("tfilenum0")
+    );
+
+    // Entering the category must enumerate its games and bind thumbnails.
+    assert!(
+        emu.vm.vars.get("realfilenum").is_some_and(|v| v != "0"),
+        "category game list not enumerated (realfilenum = {:?})",
+        emu.vm.vars.get("realfilenum")
+    );
+    assert!(
+        emu.renderer.sprite_override_count() > 0,
+        "no game thumbnails were loaded from .dat files"
+    );
+}
+
+/// Selecting a game in the populated list must launch it: the StartGame host
+/// call loads the chosen `.smf`, switching the loaded content away from FHUI.
+#[test]
+#[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
+fn fhui_menu_starts_selected_game() {
+    let dir = match game_dir() {
+        Some(d) => d,
+        None => {
+            eprintln!("skipping: no game directory found (set NATIVE32_GAME_DIR)");
+            return;
+        }
+    };
+    let menu = match find_asset(&dir, "FHUI.smf") {
+        Some(p) => p,
+        None => {
+            eprintln!("skipping: FHUI.smf not found under {}", dir.display());
+            return;
+        }
+    };
+
+    // Tap confirm to enter the category, then confirm again to launch the
+    // first game.
+    let emu = run_scripted(&menu, 260, |frame| {
+        if (50..53).contains(&frame) || (110..113).contains(&frame) {
+            vec![KEY_Z]
+        } else {
+            vec![]
+        }
+    })
+    .expect("run FHUI menu");
+
+    let name = emu
+        .filename
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_string();
+    assert!(
+        !name.eq_ignore_ascii_case("FHUI.smf"),
+        "selecting a game did not launch it: still on the menu"
+    );
+}

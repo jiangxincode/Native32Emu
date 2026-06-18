@@ -170,8 +170,10 @@ crates/
 │       ├── action_vm.rs         # Stack-based virtual machine
 │       ├── audio_engine.rs      # MP3/PCM audio (rodio for standalone, buffer for libretro)
 │       ├── content_loader.rs    # SSL multi-file content switching
+│       ├── dat_loader.rs        # .dat metadata / thumbnail decoder (front-end menu)
 │       ├── des_constants.rs     # DES permutation tables and S-boxes
 │       ├── error.rs             # Error types
+│       ├── file_browser.rs      # FHUI front-end game-list directory enumeration
 │       ├── file_loader.rs       # File I/O, header parsing, resource tables
 │       ├── frame_player.rs      # Main timeline frame playback (30fps)
 │       ├── header_decryptor.rs  # Custom DES ECB header decryption

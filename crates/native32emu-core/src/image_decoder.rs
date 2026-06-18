@@ -29,21 +29,24 @@ fn clip(v: i32) -> u8 {
 fn interpolate_y(data: &[u8], w: usize, h: usize) -> Vec<u8> {
     let h1 = h * 2;
     let mut result = vec![0u8; w * h1];
+    // Bounds-safe read: callers may pass dimensions slightly larger than the
+    // source buffer for odd-sized images (e.g. menu thumbnails).
+    let get = |i: usize| data.get(i).copied().unwrap_or(0);
     for y in 0..h {
         for dy in 0..2 {
             let y1 = y * 2 + dy;
             for x in 0..w {
                 let val = if dy == 0 {
-                    if y == 0 || data[y * w + x] != 0 {
-                        data[y * w + x]
+                    if y == 0 || get(y * w + x) != 0 {
+                        get(y * w + x)
                     } else {
-                        data[(y - 1) * w + x]
+                        get((y - 1) * w + x)
                     }
                 } else {
-                    if y == h - 1 || data[y * w + x] != 0 {
-                        data[y * w + x]
+                    if y == h - 1 || get(y * w + x) != 0 {
+                        get(y * w + x)
                     } else {
-                        data[(y + 1) * w + x]
+                        get((y + 1) * w + x)
                     }
                 };
                 result[y1 * w + x] = val;
@@ -57,21 +60,22 @@ fn interpolate_y(data: &[u8], w: usize, h: usize) -> Vec<u8> {
 fn interpolate_x(data: &[u8], w: usize, h: usize) -> Vec<u8> {
     let w1 = w * 2;
     let mut result = vec![0u8; w1 * h];
+    let get = |i: usize| data.get(i).copied().unwrap_or(0);
     for y in 0..h {
         for x in 0..w {
             for dx in 0..2 {
                 let x1 = x * 2 + dx;
                 let val = if dx == 0 {
-                    if x == 0 || data[y * w + x] != 0 {
-                        data[y * w + x]
+                    if x == 0 || get(y * w + x) != 0 {
+                        get(y * w + x)
                     } else {
-                        data[y * w + (x - 1)]
+                        get(y * w + (x - 1))
                     }
                 } else {
-                    if x == w - 1 || data[y * w + x] != 0 {
-                        data[y * w + x]
+                    if x == w - 1 || get(y * w + x) != 0 {
+                        get(y * w + x)
                     } else {
-                        data[y * w + (x + 1)]
+                        get(y * w + (x + 1))
                     }
                 };
                 result[y * w1 + x1] = val;
@@ -96,24 +100,37 @@ pub fn decode_image_yuv(data: &[u8]) -> Option<RgbaImage> {
     }
 
     let mut y_2_2 = vec![0u8; width * height];
-    let uv_w = width / 2;
-    let uv_h = height / 2;
+    // 4:2:0 packs ceil(dim/2) chroma samples / quads per axis, so that an odd
+    // width/height is fully covered by the last (clipped) quad. Using floor
+    // here would make the decoder consume one fewer quad per row than the
+    // encoder produced, drifting every row sideways and shearing the image
+    // diagonally (notably the `.dat` menu name banners and previews).
+    let uv_w = width.div_ceil(2);
+    let uv_h = height.div_ceil(2);
     let mut u_1_1 = vec![0u8; uv_w * uv_h];
     let mut v_1_1 = vec![0u8; uv_w * uv_h];
 
-    // Helper to put a 2x2 quad of Y values + U/V
+    // Helper to put a 2x2 quad of Y values + U/V. Writes are bounds-checked so
+    // that images with odd dimensions (e.g. menu thumbnails) cannot panic.
     let putquad =
         |pix: usize, y_buf: &mut [u8], u_buf: &mut [u8], v_buf: &mut [u8], chunk: &[u8]| {
             let y_coord = pix / uv_w;
             let x_coord = pix % uv_w;
+            let mut set_y = |x: usize, y: usize, val: u8| {
+                if x < width && y < height {
+                    y_buf[y * width + x] = val;
+                }
+            };
             // Y values: x0y0, x0y1, x1y0, x1y1
-            y_buf[(2 * y_coord) * width + (2 * x_coord)] = chunk[0];
-            y_buf[(2 * y_coord + 1) * width + (2 * x_coord)] = chunk[1];
-            y_buf[(2 * y_coord) * width + (2 * x_coord + 1)] = chunk[2];
-            y_buf[(2 * y_coord + 1) * width + (2 * x_coord + 1)] = chunk[3];
+            set_y(2 * x_coord, 2 * y_coord, chunk[0]);
+            set_y(2 * x_coord, 2 * y_coord + 1, chunk[1]);
+            set_y(2 * x_coord + 1, 2 * y_coord, chunk[2]);
+            set_y(2 * x_coord + 1, 2 * y_coord + 1, chunk[3]);
             // V is byte 4, U is byte 5
-            v_buf[pix] = chunk[4];
-            u_buf[pix] = chunk[5];
+            if pix < v_buf.len() {
+                v_buf[pix] = chunk[4];
+                u_buf[pix] = chunk[5];
+            }
         };
 
     let mut pixel: usize = 0;
@@ -167,20 +184,32 @@ pub fn decode_image_yuv(data: &[u8]) -> Option<RgbaImage> {
     let u_2_2 = interpolate_x(&interpolate_y(&u_1_1, uv_w, uv_h), uv_w, height);
     let v_2_2 = interpolate_x(&interpolate_y(&v_1_1, uv_w, uv_h), uv_w, height);
 
-    // Convert YUV to ARGB
+    // Convert YUV to ARGB.
+    //
+    // The upsampled chroma buffers have stride `uv_w * 2`, which equals `width`
+    // only when the width is even. For odd widths the chroma stride is
+    // `width + 1`, so the chroma must be indexed by its own stride (clamping the
+    // last column) instead of the luma width; otherwise the chroma drifts one
+    // pixel further per row, tinting the image (typically green).
+    let chroma_w = uv_w * 2;
     let mut pixels = vec![0u32; width * height];
-    for i in 0..(width * height) {
-        if y_2_2[i] == 0 {
-            // Transparent
-            pixels[i] = 0x00000000;
-        } else {
-            let c = y_2_2[i] as i32 - 16;
-            let d = u_2_2[i] as i32 - 128;
-            let e = v_2_2[i] as i32 - 128;
+    for y in 0..height {
+        for x in 0..width {
+            let li = y * width + x;
+            if y_2_2[li] == 0 {
+                // Transparent
+                pixels[li] = 0x00000000;
+                continue;
+            }
+            let cx = x.min(chroma_w.saturating_sub(1));
+            let ci = y * chroma_w + cx;
+            let c = y_2_2[li] as i32 - 16;
+            let d = u_2_2.get(ci).copied().unwrap_or(128) as i32 - 128;
+            let e = v_2_2.get(ci).copied().unwrap_or(128) as i32 - 128;
             let r = clip((298 * c + 409 * e + 128) >> 8);
             let g = clip((298 * c - 100 * d - 208 * e + 128) >> 8);
             let b = clip((298 * c + 516 * d + 128) >> 8);
-            pixels[i] = 0xFF000000 | ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
+            pixels[li] = 0xFF000000 | ((r as u32) << 16) | ((g as u32) << 8) | (b as u32);
         }
     }
 
@@ -370,6 +399,49 @@ mod tests {
         data[0..2].copy_from_slice(&0u16.to_le_bytes());
         data[2..4].copy_from_slice(&240u16.to_le_bytes());
         assert!(decode_image_yuv(&data).is_none());
+    }
+
+    #[test]
+    fn test_decode_yuv_odd_width_chroma_alignment() {
+        // Regression test: for odd widths the upsampled chroma stride differs
+        // from the luma width. The chroma must be indexed by its own stride so
+        // colors do not drift one pixel per row (which previously tinted images
+        // green). Build a 5x2 image (uv_w=2) with two horizontally adjacent
+        // quads carrying distinct, saturated chroma and verify each column has
+        // the same color on both rows.
+        let mut data = vec![0u8; 8 + 2 + 12];
+        data[0..2].copy_from_slice(&5u16.to_le_bytes()); // width (odd)
+        data[2..4].copy_from_slice(&2u16.to_le_bytes()); // height
+        data[4..8].copy_from_slice(&14u32.to_le_bytes()); // data size
+        data[8..10].copy_from_slice(&0x8002u16.to_le_bytes()); // literal: 2 quads
+                                                               // quad 0: opaque luma + cream chroma (V=133, U=108)
+        data[10..16].copy_from_slice(&[200, 200, 200, 200, 133, 108]);
+        // quad 1: opaque luma + bluish chroma (V=120, U=160)
+        data[16..22].copy_from_slice(&[200, 200, 200, 200, 120, 160]);
+
+        let img = decode_image_yuv(&data).expect("decode");
+        assert_eq!(img.width, 5);
+        assert_eq!(img.height, 2);
+
+        let px = |x: usize, y: usize| img.pixels[y * 5 + x];
+        // Each column's color must match between row 0 and row 1 (no drift).
+        assert_eq!(px(0, 0), px(0, 1), "column 0 drifted between rows");
+        assert_eq!(px(2, 0), px(2, 1), "column 2 drifted between rows");
+        // The two quads carry different chroma, so their colors must differ.
+        assert_ne!(px(0, 0), px(2, 0), "distinct chroma collapsed to one color");
+    }
+
+    #[test]
+    fn test_decode_yuv_odd_dimensions_no_panic() {
+        // Odd width and height must not panic during interpolation/conversion.
+        let mut data = vec![0u8; 8 + 2 + 6];
+        data[0..2].copy_from_slice(&3u16.to_le_bytes());
+        data[2..4].copy_from_slice(&3u16.to_le_bytes());
+        data[4..8].copy_from_slice(&8u32.to_le_bytes());
+        data[8..10].copy_from_slice(&0x8001u16.to_le_bytes());
+        data[10..16].copy_from_slice(&[200, 200, 200, 200, 130, 120]);
+        let img = decode_image_yuv(&data).expect("decode");
+        assert_eq!((img.width, img.height), (3, 3));
     }
 
     #[test]
