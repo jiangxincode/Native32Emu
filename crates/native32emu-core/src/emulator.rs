@@ -30,6 +30,10 @@ pub struct Emulator {
     pub input: InputHandler,
     pub save_manager: SaveManager,
     pub content_loader: ContentLoader,
+    /// Front-end menu (FHUI) directory browser for the game-list host calls.
+    pub file_browser: crate::file_browser::FileBrowser,
+    /// Navigation context saved/restored by the menu (GetContext/SaveContext).
+    pub menu_context: Option<String>,
     pub cur_frame_objects: Vec<FrameObject>,
     pub tick_count: u64,
     pub time_ms: u32,
@@ -65,6 +69,8 @@ impl Emulator {
             input: InputHandler::new(),
             save_manager,
             content_loader: ContentLoader::new(),
+            file_browser: crate::file_browser::FileBrowser::new(),
+            menu_context: None,
             cur_frame_objects: Vec::new(),
             tick_count: 0,
             time_ms: 0,
@@ -384,6 +390,52 @@ impl Emulator {
             .draw_frame(&mut self.reader, &self.sprites, &self.cur_frame_objects);
     }
 
+    /// Load a menu image from a `.dat` file and bind it to a menu sprite.
+    ///
+    /// `spec` has the form "<spriteName>+<flag>+<picPath>" where `<picPath>` is
+    /// a root-relative game path without extension (e.g. "/EACT    /EBBLADE").
+    /// The flag selects which embedded image to use: "D" -> the game-name
+    /// banner (grid items), "J" -> the preview screenshot (info pane). Once
+    /// decoded the image is registered as an override for the named sprite so
+    /// the renderer draws it.
+    fn load_menu_image(&mut self, spec: &str) {
+        let segments: Vec<&str> = spec.splitn(3, '+').collect();
+        if segments.len() < 3 {
+            log::warn!("LoadImage: malformed spec '{}'", spec);
+            return;
+        }
+        let sprite_name = segments[0];
+        let which = crate::dat_loader::DatImage::from_flag(segments[1]);
+        let pic_path = segments[2];
+
+        // Normalize the Native32 menu path (drop the leading slash, trim the
+        // space-padded directory components) before resolving on disk.
+        let normalized = normalize_content_path(&format!("{}.dat", pic_path));
+        let dat_path = match ContentLoader::find_content_file(&self.filename, &normalized) {
+            Some(p) => p,
+            None => {
+                log::debug!("LoadImage: thumbnail not found for '{}'", pic_path);
+                return;
+            }
+        };
+
+        let data = match std::fs::read(&dat_path) {
+            Ok(d) => d,
+            Err(e) => {
+                log::warn!("LoadImage: failed to read {}: {}", dat_path.display(), e);
+                return;
+            }
+        };
+
+        match crate::dat_loader::decode_image(&data, self.reader.colorspace, which) {
+            Some(img) => {
+                self.renderer
+                    .set_sprite_override(sprite_name.to_string(), img);
+            }
+            None => log::debug!("LoadImage: could not decode image '{}'", pic_path),
+        }
+    }
+
     /// Switch to a new content file (for SSL_PlayNext).
     fn switch_content(&mut self, filename: &str) -> anyhow::Result<()> {
         let fullpath = ContentLoader::find_content_file(&self.filename, filename)
@@ -393,6 +445,9 @@ impl Emulator {
 
         // Stop all sounds
         self.audio.stop_all();
+
+        // Drop any front-end menu thumbnail overrides from the previous content.
+        self.renderer.clear_sprite_overrides();
 
         // Reset state
         self.tick_count = 0;
@@ -605,73 +660,134 @@ impl VmHost for Emulator {
 
     fn get_url(&mut self, url: &str, target: &str) {
         let parts: Vec<&str> = target.split('+').collect();
-        if parts.len() < 2 {
-            log::warn!("Invalid GetUrl2 target: {}", target);
-            return;
-        }
+        // The front-end menu (FHUI) issues file-system and navigation host
+        // calls where the command is the first '+'-segment of the target and
+        // the result variable name is the `url`. The in-game SSL/NAV calls
+        // instead carry the command in the second segment, so dispatch on the
+        // first segment and fall through to the SSL/NAV handler.
+        let cmd = parts[0];
+        // Everything after the first '+' (used as a path/argument by the
+        // front-end file-system commands; paths never contain '+').
+        let arg = target.split_once('+').map(|x| x.1).unwrap_or("");
 
-        match parts[1] {
-            "SSL_PlayNext" => {
-                log::info!("SSL_PlayNext({}, {})", url, target);
-                let url_parts: Vec<&str> = url.split('+').collect();
-                // All parts except the last are MPEG-1 pre-content (logo /
-                // cutscene videos) to play before loading the final SSL content.
-                if url_parts.len() > 1 {
-                    let pre = &url_parts[..url_parts.len() - 1];
-                    self.queue_videos(pre);
+        match cmd {
+            "GetFileNum" => {
+                let count = self.file_browser.file_count(&self.filename, arg);
+                self.vm.vars.insert(url.to_lowercase(), count.to_string());
+            }
+            "GetFirstFile" => {
+                let name = self.file_browser.first_file(&self.filename, arg);
+                self.vm.vars.insert(url.to_lowercase(), name);
+            }
+            "GetNextFile" => {
+                let name = self.file_browser.next_file();
+                self.vm.vars.insert(url.to_lowercase(), name);
+            }
+            "GetContext" => {
+                // Restore the navigation context saved before launching a game;
+                // "NULL" tells the menu to start from its default state.
+                let value = self
+                    .menu_context
+                    .clone()
+                    .unwrap_or_else(|| "NULL".to_string());
+                self.vm.vars.insert(url.to_lowercase(), value);
+            }
+            "SaveContext" => {
+                self.menu_context = Some(url.to_string());
+            }
+            "FHUI_StrSub" => {
+                // FHUI_StrSub+<str>+<delim>+<field>+... : split <str> on the
+                // 1-character <delim> and return the 1-based <field>.
+                let value = fhui_str_sub(&parts);
+                self.vm.vars.insert(url.to_lowercase(), value);
+            }
+            "StartGame" => {
+                // `url` is a root-relative game path without extension
+                // (e.g. "/EACT    /EBBLADE"); load the matching .smf game.
+                log::info!("StartGame({})", url);
+                self.content_loader.queue_load(&format!("{}.smf", url));
+            }
+            "LoadImage" => {
+                // url = "<spriteName>+D+<picPath>" : load the thumbnail stored
+                // in <picPath>.dat and bind it to the named menu sprite.
+                self.load_menu_image(url);
+            }
+            "FormateStr" => {
+                // In FHUI this only ever formats an empty string to clear a
+                // text label; the visible game names are pre-rendered banner
+                // graphics loaded from the `.dat` files via LoadImage("D").
+                // Arbitrary text rendering would need a font subsystem that
+                // does not exist yet.
+                log::debug!("Ignoring FormateStr('{}')", url);
+            }
+            "SSL" | "NAV" => match parts.get(1).copied().unwrap_or("") {
+                "SSL_PlayNext" => {
+                    log::info!("SSL_PlayNext({}, {})", url, target);
+                    let url_parts: Vec<&str> = url.split('+').collect();
+                    // All parts except the last are MPEG-1 pre-content (logo /
+                    // cutscene videos) to play before loading the final SSL content.
+                    if url_parts.len() > 1 {
+                        let pre = &url_parts[..url_parts.len() - 1];
+                        self.queue_videos(pre);
+                    }
+                    if let Some(last) = url_parts.last() {
+                        self.content_loader.queue_load(last);
+                    }
                 }
-                if let Some(last) = url_parts.last() {
-                    self.content_loader.queue_load(last);
+                "SSL_PlayPlan" => {
+                    log::info!("Ignoring SSL_PlayPlan('{}')", url);
                 }
-            }
-            "SSL_PlayPlan" => {
-                log::info!("Ignoring SSL_PlayPlan('{}')", url);
-            }
-            "SSL_PlayProg" => {
-                log::info!("Ignoring SSL_PlayProg('{}')", url);
-            }
-            "SSL_GetSSLData" => {
-                log::info!("SSL_GetSSLData");
-                if parts.len() >= 3 {
-                    let success_var = parts[2];
-                    match self.save_manager.load() {
-                        Some(data) => {
-                            self.vm.vars.insert(url.to_lowercase(), data);
+                "SSL_PlayProg" => {
+                    log::info!("Ignoring SSL_PlayProg('{}')", url);
+                }
+                "SSL_GetSSLData" => {
+                    log::info!("SSL_GetSSLData");
+                    if parts.len() >= 3 {
+                        let success_var = parts[2];
+                        match self.save_manager.load() {
+                            Some(data) => {
+                                self.vm.vars.insert(url.to_lowercase(), data);
+                                self.vm
+                                    .vars
+                                    .insert(success_var.to_lowercase(), "S".to_string());
+                            }
+                            None => {
+                                self.vm
+                                    .vars
+                                    .insert(success_var.to_lowercase(), "N".to_string());
+                            }
+                        }
+                    }
+                }
+                "SSL_SaveSSLData" => {
+                    log::info!("SSL_SaveSSLData");
+                    if parts.len() >= 3 {
+                        let success_var = parts[2];
+                        if self.save_manager.save(url) {
                             self.vm
                                 .vars
                                 .insert(success_var.to_lowercase(), "S".to_string());
                         }
-                        None => {
-                            self.vm
-                                .vars
-                                .insert(success_var.to_lowercase(), "N".to_string());
-                        }
                     }
                 }
-            }
-            "SSL_SaveSSLData" => {
-                log::info!("SSL_SaveSSLData");
-                if parts.len() >= 3 {
-                    let success_var = parts[2];
-                    if self.save_manager.save(url) {
-                        self.vm
-                            .vars
-                            .insert(success_var.to_lowercase(), "S".to_string());
+                "NAV_ScreenMove" => {
+                    let coords: Vec<&str> = url.split('+').collect();
+                    if coords.len() >= 2 {
+                        let dx = coords[0].parse::<i32>().unwrap_or(0);
+                        let dy = coords[1].parse::<i32>().unwrap_or(0);
+                        self.renderer.screen_x = dx;
+                        self.renderer.screen_y = dy;
                     }
                 }
-            }
-            "NAV_ScreenMove" => {
-                let coords: Vec<&str> = url.split('+').collect();
-                if coords.len() >= 2 {
-                    let dx = coords[0].parse::<i32>().unwrap_or(0);
-                    let dy = coords[1].parse::<i32>().unwrap_or(0);
-                    self.renderer.screen_x = dx;
-                    self.renderer.screen_y = dy;
+                "NAV_SelectNES" => {
+                    // NES ROM browsing is handled by the original platform's NES
+                    // emulator, which is out of scope for this core.
+                    log::debug!("Ignoring NAV_SelectNES('{}')", url);
                 }
-            }
-            "GetFileNum" | "GetContext" => {
-                log::debug!("Ignoring GetUrl2('{}', '{}')", url, target);
-            }
+                other => {
+                    log::warn!("Unhandled GetUrl2('{}', '{}') [{}]", url, target, other);
+                }
+            },
             _ => {
                 log::warn!("Unhandled GetUrl2('{}', '{}')", url, target);
             }
@@ -702,6 +818,29 @@ fn str_to_float(s: &str) -> f64 {
         return 0.0;
     }
     s.parse::<f64>().unwrap_or(0.0)
+}
+
+/// FHUI_StrSub host helper: split the source string `parts[1]` on the
+/// delimiter `parts[2]` and return its 1-based field `parts[3]`.
+fn fhui_str_sub(parts: &[&str]) -> String {
+    if parts.len() < 4 {
+        return String::new();
+    }
+    let source = parts[1];
+    let delim = parts[2];
+    let field: usize = parts[3].trim().parse().unwrap_or(0);
+    if field == 0 {
+        return String::new();
+    }
+    let fields: Vec<&str> = if delim.is_empty() {
+        vec![source]
+    } else {
+        source.split(delim).collect()
+    };
+    fields
+        .get(field - 1)
+        .map(|s| s.to_string())
+        .unwrap_or_default()
 }
 
 /// Normalize a Native32 content path: split on '/', trim each component

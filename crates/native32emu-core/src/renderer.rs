@@ -1,13 +1,21 @@
 // Renderer: draws the current frame's visible objects sorted by depth.
 
+use std::collections::HashMap;
 use std::path::Path;
 
 use crate::file_loader::{FrameObject, Native32Reader, ObjectType};
 use crate::image_decoder::RgbaImage;
 use crate::sprite_system::SpriteSystem;
 
+/// What a draw entry should blit: either an image from the game's image table,
+/// or a runtime-supplied override image (used by the front-end menu thumbnails).
+enum DrawSource {
+    Image(u32),
+    Override(String),
+}
+
 pub struct DrawEntry {
-    pub image_index: u32,
+    source: DrawSource,
     pub x: i32,
     pub y: i32,
     pub depth: u32,
@@ -19,6 +27,9 @@ pub struct Renderer {
     pub buffer: Vec<u32>,
     pub width: u32,
     pub height: u32,
+    /// Runtime image overrides keyed by sprite name (front-end menu thumbnails
+    /// loaded from `.dat` files via the LoadImage host call).
+    sprite_overrides: HashMap<String, RgbaImage>,
 }
 
 impl Renderer {
@@ -29,7 +40,24 @@ impl Renderer {
             buffer: vec![0xFF000000; (width * height) as usize],
             width,
             height,
+            sprite_overrides: HashMap::new(),
         }
+    }
+
+    /// Bind a decoded image to a sprite name so it is drawn in place of the
+    /// sprite's normal movie-frame image.
+    pub fn set_sprite_override(&mut self, name: String, image: RgbaImage) {
+        self.sprite_overrides.insert(name, image);
+    }
+
+    /// Drop all sprite image overrides (e.g. when switching content).
+    pub fn clear_sprite_overrides(&mut self) {
+        self.sprite_overrides.clear();
+    }
+
+    /// Number of active sprite image overrides (for diagnostics/tests).
+    pub fn sprite_override_count(&self) -> usize {
+        self.sprite_overrides.len()
     }
 
     /// Resize the display buffer (e.g., when scaling changes).
@@ -58,7 +86,7 @@ impl Renderer {
         for obj in cur_frame {
             if obj.obj_type == ObjectType::Image {
                 drawlist.push(DrawEntry {
-                    image_index: obj.index as u32,
+                    source: DrawSource::Image(obj.index as u32),
                     x: obj.x as i32,
                     y: obj.y as i32,
                     depth: obj.depth as u32,
@@ -67,15 +95,33 @@ impl Renderer {
         }
 
         // Visible movie instances
-        for (_, movie) in sprites.iter() {
+        for (name, movie) in sprites.iter() {
             if !movie.visible {
+                continue;
+            }
+            // A runtime override (menu thumbnail) takes precedence over the
+            // sprite's normal movie-frame image.
+            if self.sprite_overrides.contains_key(name) {
+                let (fx, fy) = {
+                    let movie_frames = reader.get_movie(movie.movie);
+                    movie_frames
+                        .get(movie.frame)
+                        .map(|f| (f.x as i32, f.y as i32))
+                        .unwrap_or((0, 0))
+                };
+                drawlist.push(DrawEntry {
+                    source: DrawSource::Override(name.clone()),
+                    x: movie.x as i32 + fx,
+                    y: movie.y as i32 + fy,
+                    depth: movie.depth as u32,
+                });
                 continue;
             }
             let movie_frames = reader.get_movie(movie.movie);
             if movie.frame < movie_frames.len() {
                 let frame = &movie_frames[movie.frame];
                 drawlist.push(DrawEntry {
-                    image_index: frame.image as u32,
+                    source: DrawSource::Image(frame.image as u32),
                     x: movie.x as i32 + frame.x as i32,
                     y: movie.y as i32 + frame.y as i32,
                     depth: movie.depth as u32,
@@ -88,8 +134,19 @@ impl Renderer {
 
         // Draw each entry
         for entry in &drawlist {
-            if let Some(img) = reader.get_image(entry.image_index) {
-                self.blit_image(&img, entry.x + self.screen_x, entry.y + self.screen_y);
+            let x = entry.x + self.screen_x;
+            let y = entry.y + self.screen_y;
+            match &entry.source {
+                DrawSource::Image(index) => {
+                    if let Some(img) = reader.get_image(*index) {
+                        self.blit_image(&img, x, y);
+                    }
+                }
+                DrawSource::Override(name) => {
+                    if let Some(img) = self.sprite_overrides.get(name).cloned() {
+                        self.blit_image(&img, x, y);
+                    }
+                }
             }
         }
     }
