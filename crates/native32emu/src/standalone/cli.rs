@@ -8,7 +8,9 @@ use std::path::PathBuf;
 #[command(about = "A Native32 game emulator written in Rust")]
 #[command(version)]
 pub struct Cli {
-    /// Path to the game file (.smf, .sgm, or .ssl)
+    /// Path to the game file (.smf, .sgm, .ssl, or .zip)
+    ///
+    /// For .zip files, extracts the archive and loads FHUI.smf (main menu).
     pub game_path: Option<PathBuf>,
 
     /// Integer scaling factor (1-16)

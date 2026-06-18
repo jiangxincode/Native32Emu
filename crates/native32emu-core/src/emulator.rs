@@ -46,9 +46,19 @@ pub struct Emulator {
 
 impl Emulator {
     /// Create a new emulator from a game file path.
+    ///
+    /// Supports .smf, .sgm, .ssl, and .zip files. For .zip files, extracts
+    /// the archive and loads FHUI.smf (main menu) from the extracted directory.
     pub fn from_path(path: PathBuf, volume: u32) -> Result<Self> {
-        let data = std::fs::read(&path)
-            .with_context(|| format!("Failed to read game file: {}", path.display()))?;
+        // Check if this is a ZIP file
+        let game_path = if is_zip_file(&path) {
+            crate::archive_loader::load_zip_game(&path)?
+        } else {
+            path
+        };
+
+        let data = std::fs::read(&game_path)
+            .with_context(|| format!("Failed to read game file: {}", game_path.display()))?;
 
         let mut reader = Native32Reader::new(data);
         reader.init().context("Failed to initialize game file")?;
@@ -56,10 +66,10 @@ impl Emulator {
         let resolution = reader.resolution;
         let colorspace = reader.colorspace;
 
-        let save_manager = SaveManager::new(&path);
+        let save_manager = SaveManager::new(&game_path);
 
         Ok(Self {
-            filename: path,
+            filename: game_path,
             reader,
             sprites: SpriteSystem::new(),
             frame_player: FramePlayer::new(),
@@ -865,4 +875,26 @@ fn normalize_content_path(filename: &str) -> String {
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join("/")
+}
+
+/// Check if a file is a ZIP archive by reading its magic bytes.
+///
+/// ZIP files start with "PK\x03\x04" (local file header signature).
+fn is_zip_file(path: &PathBuf) -> bool {
+    // First check the extension
+    if let Some(ext) = path.extension() {
+        if ext.to_string_lossy().eq_ignore_ascii_case("zip") {
+            return true;
+        }
+    }
+
+    // Fallback: check magic bytes
+    if let Ok(mut file) = std::fs::File::open(path) {
+        let mut magic = [0u8; 4];
+        if std::io::Read::read_exact(&mut file, &mut magic).is_ok() {
+            return magic == [0x50, 0x4B, 0x03, 0x04]; // PK\x03\x04
+        }
+    }
+
+    false
 }
