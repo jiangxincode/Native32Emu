@@ -7,6 +7,7 @@ use super::callbacks;
 use super::constants::*;
 use super::types::*;
 use native32emu_core::emulator::Emulator;
+use native32emu_core::input_handler::InputHandler;
 use std::ffi::{c_void, CStr};
 use std::ptr;
 
@@ -31,6 +32,9 @@ unsafe fn get_emulator_mut() -> &'static mut Emulator {
 #[no_mangle]
 pub extern "C" fn retro_set_environment(cb: retro_environment_t) {
     callbacks::set_environment(cb);
+    // Declare core options as early as possible so the frontend can show them
+    // before any content is loaded.
+    set_core_options();
 }
 
 /// Set video refresh callback
@@ -157,9 +161,11 @@ pub extern "C" fn retro_load_game(info: *const retro_game_info) -> bool {
 
         // Create emulator instance
         match Emulator::from_path(std::path::PathBuf::from(path), 100) {
-            Ok(emu) => {
+            Ok(mut emu) => {
                 let (width, height) = emu.get_resolution();
                 log::info!("Game loaded: {} ({}x{})", path, width, height);
+                // Apply the user's current core option selections.
+                apply_core_options(&mut emu);
                 EMULATOR = Some(emu);
                 true
             }
@@ -210,6 +216,11 @@ pub extern "C" fn retro_run() {
     unsafe {
         let emu = get_emulator_mut();
 
+        // 0. Re-apply core options if the user changed them in the frontend menu.
+        if core_options_changed() {
+            apply_core_options(emu);
+        }
+
         // 1. Poll input
         callbacks::input_poll();
 
@@ -219,8 +230,12 @@ pub extern "C" fn retro_run() {
 
         // 3. Handle button events. During a cutscene, suppress game input and
         // allow the A or B button to skip the logo/cutscene videos instead.
+        // When auto-skip is enabled, skip as soon as the cutscene starts.
         if emu.is_cutscene_active() {
-            if buttons.contains(&NATIVE32_KEY_A) || buttons.contains(&NATIVE32_KEY_B) {
+            if emu.auto_skip_cutscenes
+                || buttons.contains(&NATIVE32_KEY_A)
+                || buttons.contains(&NATIVE32_KEY_B)
+            {
                 emu.skip_cutscene();
             }
         } else {
@@ -363,6 +378,103 @@ pub extern "C" fn retro_load_game_special(
 // ============================================================
 // Helper functions
 // ============================================================
+
+/// Register the core's configurable options with the frontend.
+///
+/// Uses the legacy `RETRO_ENVIRONMENT_SET_VARIABLES` interface, which every
+/// libretro frontend supports (modern RetroArch transparently upgrades it to
+/// the categorized core-options UI). Each value string is "Description; " plus
+/// a pipe-separated list of choices whose first entry is the default.
+fn set_core_options() {
+    let variables = [
+        retro_variable {
+            key: c"native32emu_volume".as_ptr(),
+            value: c"Audio Volume (%); 100|90|80|70|60|50|40|30|20|10|0".as_ptr(),
+        },
+        retro_variable {
+            key: c"native32emu_repeat_delay".as_ptr(),
+            value: c"Key auto-repeat delay (frames); 12|2|4|6|8|10|14|16|18|20|24|30".as_ptr(),
+        },
+        retro_variable {
+            key: c"native32emu_repeat_period".as_ptr(),
+            value: c"Key auto-repeat period (frames); 3|1|2|4|5|6|8|10".as_ptr(),
+        },
+        retro_variable {
+            key: c"native32emu_swap_ab".as_ptr(),
+            value: c"Swap A/B buttons; disabled|enabled".as_ptr(),
+        },
+        retro_variable {
+            key: c"native32emu_auto_skip_cutscenes".as_ptr(),
+            value: c"Auto-skip cutscene videos; disabled|enabled".as_ptr(),
+        },
+        // Terminator
+        retro_variable {
+            key: ptr::null(),
+            value: ptr::null(),
+        },
+    ];
+
+    // The frontend copies the data during the call, so a stack array is fine.
+    callbacks::environment(
+        RETRO_ENVIRONMENT_SET_VARIABLES,
+        variables.as_ptr() as *mut c_void,
+    );
+}
+
+/// Read a single core option value from the frontend by key.
+///
+/// Returns `None` if the option is unset or the frontend does not support
+/// variables.
+fn get_core_option(key: &CStr) -> Option<String> {
+    let mut var = retro_variable {
+        key: key.as_ptr(),
+        value: ptr::null(),
+    };
+    let ok = callbacks::environment(
+        RETRO_ENVIRONMENT_GET_VARIABLE,
+        &mut var as *mut _ as *mut c_void,
+    );
+    if ok && !var.value.is_null() {
+        unsafe { CStr::from_ptr(var.value).to_str().ok().map(str::to_owned) }
+    } else {
+        None
+    }
+}
+
+/// Ask the frontend whether any core option changed since the last query.
+fn core_options_changed() -> bool {
+    let mut updated = false;
+    let ok = callbacks::environment(
+        RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE,
+        &mut updated as *mut _ as *mut c_void,
+    );
+    ok && updated
+}
+
+/// Apply the current core option selections to the running emulator.
+fn apply_core_options(emu: &mut Emulator) {
+    if let Some(volume) = get_core_option(c"native32emu_volume").and_then(|v| v.parse::<u32>().ok())
+    {
+        emu.audio.set_volume(volume);
+    }
+
+    let delay = get_core_option(c"native32emu_repeat_delay").and_then(|v| v.parse::<u32>().ok());
+    let period = get_core_option(c"native32emu_repeat_period").and_then(|v| v.parse::<u32>().ok());
+    if delay.is_some() || period.is_some() {
+        emu.input.set_repeat_timing(
+            delay.unwrap_or(InputHandler::DEFAULT_REPEAT_DELAY),
+            period.unwrap_or(InputHandler::DEFAULT_REPEAT_PERIOD),
+        );
+    }
+
+    if let Some(swap) = get_core_option(c"native32emu_swap_ab") {
+        emu.input.set_swap_ab(swap == "enabled");
+    }
+
+    if let Some(skip) = get_core_option(c"native32emu_auto_skip_cutscenes") {
+        emu.set_auto_skip_cutscenes(skip == "enabled");
+    }
+}
 
 /// Register input descriptors with the frontend
 fn register_input_descriptors() {

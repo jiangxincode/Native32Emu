@@ -25,6 +25,14 @@ pub struct Cli {
     #[arg(short, long, default_value = "100", value_parser = clap::value_parser!(u32).range(0..=100))]
     pub volume: u32,
 
+    /// Swap the A and B buttons
+    #[arg(long = "swap-ab")]
+    pub swap_ab: bool,
+
+    /// Automatically skip cutscene/intro videos instead of playing them
+    #[arg(long = "auto-skip-cutscenes")]
+    pub auto_skip_cutscenes: bool,
+
     /// Enable debug/development mode
     #[arg(long)]
     pub debug: bool,

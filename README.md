@@ -80,7 +80,13 @@ for install and build instructions.
 - ✅ Game loading (.smf, .sgm, .ssl, .zip files)
 - ⚠️ MP3 audio (not yet implemented — only RAW PCM works)
 - ❌ Save states (not yet implemented)
-- ❌ Core options (not yet implemented)
+- ✅ Core options (audio volume, key auto-repeat timing, swap A/B, auto-skip cutscenes)
+
+#### Core Options
+
+Configurable from RetroArch's *Quick Menu → Core Options* (audio volume, key
+auto-repeat timing, swap A/B, auto-skip cutscenes). See
+[Core Options](docs/Core-Options.md) for the full list.
 
 #### RetroPad Button Mapping
 

@@ -121,6 +121,10 @@ fn main() -> Result<()> {
     emu.input
         .set_repeat_timing(cli.repeat_delay, cli.repeat_period);
 
+    // Apply shared core settings (also exposed as libretro core options).
+    emu.input.set_swap_ab(cli.swap_ab);
+    emu.set_auto_skip_cutscenes(cli.auto_skip_cutscenes);
+
     let resolution = emu.reader.resolution;
     let display_width = resolution.0 * cli.scale;
     let display_height = resolution.1 * cli.scale;
@@ -193,8 +197,9 @@ fn main() -> Result<()> {
         let pressed = emu.input.get_pressed_keycodes(&window);
         emu.set_buttons(&pressed);
         if emu.is_cutscene_active() {
-            // Allow skipping logo/cutscene videos with the A or B button.
-            if pressed.contains(&0x4000) || pressed.contains(&0x8800) {
+            // Allow skipping logo/cutscene videos with the A or B button, or
+            // automatically when auto-skip is enabled.
+            if emu.auto_skip_cutscenes || pressed.contains(&0x4000) || pressed.contains(&0x8800) {
                 emu.skip_cutscene();
             }
         } else {

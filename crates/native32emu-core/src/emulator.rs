@@ -46,6 +46,9 @@ pub struct Emulator {
     /// Set to None when the user loaded a game directly (not from a menu).
     /// Used to support "return to menu" on ESC.
     pub initial_file: Option<PathBuf>,
+    /// When true, cutscene videos are skipped automatically as soon as they
+    /// become active, instead of waiting for the user to press A/B.
+    pub auto_skip_cutscenes: bool,
     /// Temporary directory handle for ZIP extraction. When this field is
     /// dropped (e.g. when the Emulator is dropped), the directory is deleted.
     _temp_dir: Option<tempfile::TempDir>,
@@ -104,6 +107,7 @@ impl Emulator {
             pending_videos: Vec::new(),
             video_player: None,
             initial_file,
+            auto_skip_cutscenes: false,
             _temp_dir,
         })
     }
@@ -161,6 +165,11 @@ impl Emulator {
     /// Set button state from libretro input.
     pub fn set_buttons(&mut self, keycodes: &[u16]) {
         self.input.set_buttons(keycodes);
+    }
+
+    /// Enable or disable automatic skipping of cutscene videos.
+    pub fn set_auto_skip_cutscenes(&mut self, enabled: bool) {
+        self.auto_skip_cutscenes = enabled;
     }
 
     /// Load a new frame and set up sprites.
