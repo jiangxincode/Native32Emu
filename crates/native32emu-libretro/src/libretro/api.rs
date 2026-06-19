@@ -94,9 +94,12 @@ pub extern "C" fn retro_get_system_info(info: *mut retro_system_info) {
         (*info) = retro_system_info {
             library_name: c"Native32Emu".as_ptr(),
             library_version: c"0.1.0".as_ptr(),
-            valid_extensions: c"smf|sgm|ssl".as_ptr(),
+            valid_extensions: c"smf|sgm|ssl|zip".as_ptr(),
             need_fullpath: true,
-            block_extract: false,
+            // A .zip is a complete Native32 game package; the core extracts it
+            // itself and boots FHUI.smf, so RetroArch must hand over the whole
+            // archive rather than auto-extracting and passing an inner file.
+            block_extract: true,
         };
     }
 }
