@@ -230,8 +230,12 @@ pub extern "C" fn retro_run() {
 
         // 3. Handle button events. During a cutscene, suppress game input and
         // allow the A or B button to skip the logo/cutscene videos instead.
+        // When auto-skip is enabled, skip as soon as the cutscene starts.
         if emu.is_cutscene_active() {
-            if buttons.contains(&NATIVE32_KEY_A) || buttons.contains(&NATIVE32_KEY_B) {
+            if emu.auto_skip_cutscenes
+                || buttons.contains(&NATIVE32_KEY_A)
+                || buttons.contains(&NATIVE32_KEY_B)
+            {
                 emu.skip_cutscene();
             }
         } else {
@@ -395,6 +399,14 @@ fn set_core_options() {
             key: c"native32emu_repeat_period".as_ptr(),
             value: c"Key auto-repeat period (frames); 3|1|2|4|5|6|8|10".as_ptr(),
         },
+        retro_variable {
+            key: c"native32emu_swap_ab".as_ptr(),
+            value: c"Swap A/B buttons; disabled|enabled".as_ptr(),
+        },
+        retro_variable {
+            key: c"native32emu_auto_skip_cutscenes".as_ptr(),
+            value: c"Auto-skip cutscene videos; disabled|enabled".as_ptr(),
+        },
         // Terminator
         retro_variable {
             key: ptr::null(),
@@ -453,6 +465,14 @@ fn apply_core_options(emu: &mut Emulator) {
             delay.unwrap_or(InputHandler::DEFAULT_REPEAT_DELAY),
             period.unwrap_or(InputHandler::DEFAULT_REPEAT_PERIOD),
         );
+    }
+
+    if let Some(swap) = get_core_option(c"native32emu_swap_ab") {
+        emu.input.set_swap_ab(swap == "enabled");
+    }
+
+    if let Some(skip) = get_core_option(c"native32emu_auto_skip_cutscenes") {
+        emu.set_auto_skip_cutscenes(skip == "enabled");
     }
 }
 

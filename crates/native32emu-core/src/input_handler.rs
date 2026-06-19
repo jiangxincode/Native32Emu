@@ -4,6 +4,11 @@
 use std::collections::HashMap;
 use std::collections::HashSet;
 
+/// Native32 keycode for the A button (south/confirm).
+pub const KEYCODE_A: u16 = 0x4000;
+/// Native32 keycode for the B button (east/cancel).
+pub const KEYCODE_B: u16 = 0x8800;
+
 /// Default keycode mappings: Native32 keycode -> minifb Key
 #[cfg(feature = "standalone")]
 pub const DEFAULT_KEY_MAP: &[(u16, minifb::Key)] = &[
@@ -11,8 +16,8 @@ pub const DEFAULT_KEY_MAP: &[(u16, minifb::Key)] = &[
     (0x0400, minifb::Key::Right),
     (0x1c00, minifb::Key::Up),
     (0x1e00, minifb::Key::Down),
-    (0x4000, minifb::Key::Z),
-    (0x8800, minifb::Key::X),
+    (KEYCODE_A, minifb::Key::Z),
+    (KEYCODE_B, minifb::Key::X),
 ];
 
 pub struct InputHandler {
@@ -28,6 +33,8 @@ pub struct InputHandler {
     repeat_delay: u32,
     /// Frames between auto-repeat pulses once repeating.
     repeat_period: u32,
+    /// When true, the A and B buttons are swapped before processing.
+    swap_ab: bool,
 }
 
 impl Default for InputHandler {
@@ -64,6 +71,7 @@ impl InputHandler {
             active_buttons: HashSet::new(),
             repeat_delay: Self::DEFAULT_REPEAT_DELAY,
             repeat_period: Self::DEFAULT_REPEAT_PERIOD,
+            swap_ab: false,
         }
     }
 
@@ -71,6 +79,20 @@ impl InputHandler {
     pub fn set_repeat_timing(&mut self, delay: u32, period: u32) {
         self.repeat_delay = delay;
         self.repeat_period = period.max(1);
+    }
+
+    /// Enable or disable swapping the A and B buttons.
+    pub fn set_swap_ab(&mut self, swap: bool) {
+        self.swap_ab = swap;
+    }
+
+    /// Swap the A and B keycodes; all other keycodes pass through unchanged.
+    fn apply_ab_swap(keycode: u16) -> u16 {
+        match keycode {
+            KEYCODE_A => KEYCODE_B,
+            KEYCODE_B => KEYCODE_A,
+            other => other,
+        }
     }
 
     /// Decide whether a key that has been held for `count` frames should be
@@ -125,6 +147,16 @@ impl InputHandler {
     /// its initial press, goes quiet for `repeat_delay` frames, then pulses
     /// every `repeat_period` frames, matching the hardware keypad driver.
     pub fn set_buttons(&mut self, keycodes: &[u16]) {
+        // Optionally swap A/B before any other processing so downstream logic
+        // (typematic filtering, button-event dispatch) sees the swapped layout.
+        let swapped: Vec<u16>;
+        let keycodes: &[u16] = if self.swap_ab {
+            swapped = keycodes.iter().map(|&k| Self::apply_ab_swap(k)).collect();
+            &swapped
+        } else {
+            keycodes
+        };
+
         let mut new_counts = std::collections::HashMap::with_capacity(keycodes.len());
         let mut active = HashSet::new();
         for &keycode in keycodes {
@@ -267,5 +299,32 @@ mod tests {
         // Re-press registers immediately as a fresh initial press.
         handler.set_buttons(&[0x0200]);
         assert!(handler.get_pressed_buttons().contains(&0x0200));
+    }
+
+    #[test]
+    fn test_swap_ab_swaps_a_and_b() {
+        let mut handler = InputHandler::new();
+        handler.set_swap_ab(true);
+        handler.set_buttons(&[KEYCODE_A]);
+        // Pressing A registers as B when swapped.
+        assert!(handler.get_pressed_buttons().contains(&KEYCODE_B));
+        assert!(!handler.get_pressed_buttons().contains(&KEYCODE_A));
+    }
+
+    #[test]
+    fn test_swap_ab_leaves_directions_untouched() {
+        let mut handler = InputHandler::new();
+        handler.set_swap_ab(true);
+        handler.set_buttons(&[0x0200, KEYCODE_B]); // Left + B
+        let pressed = handler.get_pressed_buttons();
+        assert!(pressed.contains(&0x0200)); // direction unchanged
+        assert!(pressed.contains(&KEYCODE_A)); // B -> A when swapped
+    }
+
+    #[test]
+    fn test_swap_ab_disabled_by_default() {
+        let mut handler = InputHandler::new();
+        handler.set_buttons(&[KEYCODE_A]);
+        assert!(handler.get_pressed_buttons().contains(&KEYCODE_A));
     }
 }

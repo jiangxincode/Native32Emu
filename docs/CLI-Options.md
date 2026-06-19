@@ -24,6 +24,8 @@ native32-emu [OPTIONS] <GAME_PATH>
 | `-s, --scale <N>` | `1`–`16` | `1` | Integer scaling factor for the window. |
 | `-f, --fullscreen` | flag | off | Run in borderless fullscreen at the desktop resolution. |
 | `-v, --volume <N>` | `0`–`100` | `100` | Volume level (`0` = mute, `100` = original). |
+| `--swap-ab` | flag | off | Swap the A and B button actions. |
+| `--auto-skip-cutscenes` | flag | off | Automatically skip logo/intro/cutscene videos instead of playing them. |
 | `--debug` | flag | off | Enable debug/development mode. |
 | `--remap <KEYCODE:KEY>` | string | — | Remap a Native32 keycode to a physical key. Repeatable. |
 | `-S, --screenshot <PATH>` | path | — | Render some frames, save a PNG screenshot, then exit. |
@@ -112,6 +114,9 @@ native32-emu --scale 2 --volume 80 path/to/game.smf
 
 # Fullscreen
 native32-emu --fullscreen game.smf
+
+# Swap A/B and skip intro videos
+native32-emu --swap-ab --auto-skip-cutscenes game.smf
 
 # Show the on-screen gamepad overlay
 native32-emu --show-gamepad game.smf
