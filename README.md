@@ -196,7 +196,7 @@ crates/
 
 ## Game Compatibility
 
-Game resources can be downloaded from [Baidu Netdisk](https://pan.baidu.com/s/1b5sY3JFEP2HtxiKngOJ3VA?pwd=aloy).
+Game resources can be downloaded from [Baidu Netdisk](https://pan.baidu.com/s/1CuNeJe-RKXG_E-LhdI5ldg?pwd=aloy).
 
 All 84 Native32 games in the test suite load and run without fatal errors.
 
