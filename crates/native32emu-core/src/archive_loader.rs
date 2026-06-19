@@ -118,7 +118,7 @@ mod tests {
 
         // Create an empty ZIP file
         let file = fs::File::create(&zip_path).unwrap();
-        let mut zip = zip::ZipWriter::new(file);
+        let zip = zip::ZipWriter::new(file);
         zip.finish().unwrap();
 
         let result = extract_zip(&zip_path);
@@ -134,8 +134,8 @@ mod tests {
         // Create a ZIP with FHUI.smf
         let file = fs::File::create(&zip_path).unwrap();
         let mut zip = zip::ZipWriter::new(file);
-        let options =
-            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
 
         zip.start_file("FHUI.smf", options).unwrap();
         zip.write_all(b"fake smf content").unwrap();
@@ -198,8 +198,8 @@ mod tests {
         // Create a ZIP with FHUI.smf
         let file = fs::File::create(&zip_path).unwrap();
         let mut zip = zip::ZipWriter::new(file);
-        let options =
-            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
 
         zip.start_file("FHUI.smf", options).unwrap();
         zip.write_all(b"fake smf content").unwrap();
@@ -222,8 +222,8 @@ mod tests {
         // Create a ZIP without FHUI.smf
         let file = fs::File::create(&zip_path).unwrap();
         let mut zip = zip::ZipWriter::new(file);
-        let options =
-            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
 
         zip.start_file("other.smf", options).unwrap();
         zip.write_all(b"fake smf content").unwrap();
@@ -241,8 +241,8 @@ mod tests {
         // Create a ZIP with nested structure (FHUI.smf in root, not in subdirectory)
         let file = fs::File::create(&zip_path).unwrap();
         let mut zip = zip::ZipWriter::new(file);
-        let options =
-            zip::write::FileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
 
         // Add FHUI.smf in root (typical structure)
         zip.start_file("FHUI.smf", options).unwrap();
