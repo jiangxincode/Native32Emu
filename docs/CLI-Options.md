@@ -20,7 +20,7 @@ native32-emu [OPTIONS] <GAME_PATH>
 
 | Option | Value | Default | Description |
 |---|---|---|---|
-| `<GAME_PATH>` | path | *required* | Path to the game file (`.smf`, `.sgm`, or `.ssl`). |
+| `<GAME_PATH>` | path | *required* | Path to the game file (`.smf`, `.sgm`, `.ssl`, or `.zip`). For `.zip` files, extracts and loads FHUI.smf automatically. |
 | `-s, --scale <N>` | `1`–`16` | `1` | Integer scaling factor for the window. |
 | `-f, --fullscreen` | flag | off | Run in borderless fullscreen at the desktop resolution. |
 | `-v, --volume <N>` | `0`–`100` | `100` | Volume level (`0` = mute, `100` = original). |
@@ -103,6 +103,9 @@ first repeat arrives.
 ```bash
 # Basic usage
 native32-emu path/to/game.smf
+
+# Load from ZIP archive (auto-extracts and loads FHUI.smf)
+native32-emu path/to/game.zip
 
 # 2x scaling with 80% volume
 native32-emu --scale 2 --volume 80 path/to/game.smf

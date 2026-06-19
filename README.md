@@ -22,6 +22,7 @@ Native32 is a game format developed by Sunplus for DVD player and TV chipsets (c
 - **Sprite/movie system** — animation, cloning, visibility control, depth-sorted rendering
 - **Audio playback** — MP3 music and raw 16-bit PCM sound effects
 - **MPEG-1 cutscenes** — pure-Rust MPEG-1 video + MP2 audio decoder plays `SSL_PlayNext` logo/cutscene videos (no C dependency); skippable with A/B
+- **ZIP archive support** — load game packages directly from `.zip` files (auto-extracts and loads FHUI.smf)
 - **Keyboard input** — configurable key remapping
 - **Save system** — `.ssl_sav` file persistence
 - **SSL multi-file content** — seamless switching between game levels/files
@@ -40,9 +41,17 @@ The basic usage is list below, but there are many more options for controlling t
 # Basic usage
 native32-emu path/to/game.smf
 
+# Load from ZIP archive (auto-extracts and loads FHUI.smf)
+native32-emu path/to/game.zip
+
 # Fullscreen mode
 native32-emu --fullscreen game.smf
 ```
+
+**ZIP mode**: When loading from a `.zip` file, the emulator starts the FHUI
+menu. Selecting a game launches it; pressing **ESC** during gameplay returns to
+the menu. Pressing ESC on the menu itself exits the emulator. When loading a
+`.smf` file directly, ESC exits as usual.
 
 ### RetroArch Mode
 
@@ -55,7 +64,7 @@ Native32Emu can be used as a libretro core with RetroArch, allowing you to play 
 3. **Load the core in RetroArch**:
    - Open RetroArch
    - Select "Load Core" → "Native32 (Native32Emu)"
-   - Select "Load Content" and choose a `.smf`, `.sgm`, or `.ssl` game file
+   - Select "Load Content" and choose a `.smf`, `.sgm`, `.ssl`, or `.zip` game file
 
 #### RetroArch on Android
 
@@ -68,7 +77,7 @@ for install and build instructions.
 - ✅ Video output (XRGB8888 pixel format)
 - ✅ Audio output (RAW PCM, stereo)
 - ✅ Input handling (D-Pad + A/B buttons)
-- ✅ Game loading (.smf, .sgm, .ssl files)
+- ✅ Game loading (.smf, .sgm, .ssl, .zip files)
 - ⚠️ MP3 audio (not yet implemented — only RAW PCM works)
 - ❌ Save states (not yet implemented)
 - ❌ Core options (not yet implemented)

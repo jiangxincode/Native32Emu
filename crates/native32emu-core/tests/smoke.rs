@@ -356,3 +356,60 @@ fn fhui_menu_starts_selected_game() {
         "selecting a game did not launch it: still on the menu"
     );
 }
+
+/// Test ZIP file loading: a ZIP archive containing FHUI.smf should be extracted
+/// and the main menu loaded automatically.
+#[test]
+#[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
+fn zip_file_loads_fhui() {
+    let dir = match game_dir() {
+        Some(d) => d,
+        None => {
+            eprintln!("skipping: no game directory found (set NATIVE32_GAME_DIR)");
+            return;
+        }
+    };
+
+    // Look for a ZIP file in the parent directory (tmp/native32_game.zip)
+    let zip_path = dir
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|root| root.join("tmp").join("native32_game.zip"))
+        .filter(|p| p.exists());
+
+    let zip_path = match zip_path {
+        Some(p) => p,
+        None => {
+            eprintln!("skipping: native32_game.zip not found");
+            return;
+        }
+    };
+
+    // Load the ZIP file
+    let mut emu = Emulator::from_path(zip_path, 100).expect("failed to load ZIP game");
+
+    // Verify that FHUI.smf was loaded (the main menu)
+    let name = emu
+        .filename
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_string();
+    assert!(
+        name.eq_ignore_ascii_case("FHUI.smf"),
+        "expected FHUI.smf to be loaded from ZIP, but got: {name}"
+    );
+
+    // Run a few frames to ensure it's functional
+    for _ in 0..30 {
+        emu.set_buttons(&[]);
+        emu.handle_buttons();
+        emu.tick();
+        emu.draw();
+    }
+
+    assert!(
+        frame_has_content(emu.get_framebuffer()),
+        "ZIP-loaded FHUI.smf produced a blank frame"
+    );
+}

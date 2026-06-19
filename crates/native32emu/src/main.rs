@@ -164,8 +164,29 @@ fn main() -> Result<()> {
     // Main emulation loop
     let mut frame_count: u32 = 0;
     let screenshot_path = cli.screenshot.clone();
+    // Debounce counter: after returning to menu via ESC, suppress further ESC
+    // detections for a few frames so the key release is not re-triggered.
+    let mut esc_cooldown: u32 = 0;
 
-    while window.is_open() && !window.is_key_down(minifb::Key::Escape) {
+    while window.is_open() {
+        // Handle ESC key: return to menu (ZIP mode) or exit.
+        if esc_cooldown > 0 {
+            esc_cooldown -= 1;
+        } else if window.is_key_down(minifb::Key::Escape) {
+            if emu.can_return_to_menu() {
+                if let Some(menu_path) = emu.initial_file.clone() {
+                    if let Err(e) = emu.reload_from_path(menu_path) {
+                        log::error!("Failed to reload menu: {}", e);
+                        break;
+                    }
+                }
+                esc_cooldown = 15; // ~0.5s at 30fps, enough for key release
+                continue;
+            } else {
+                break;
+            }
+        }
+
         let frame_start = Instant::now();
 
         // Feed keyboard state into the shared core, then run button actions

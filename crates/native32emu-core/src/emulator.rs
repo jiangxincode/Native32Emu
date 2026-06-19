@@ -42,13 +42,32 @@ pub struct Emulator {
     pub pending_videos: Vec<String>,
     /// Active cutscene player, if a video is currently playing.
     pub video_player: Option<crate::mpeg::VideoPlayer>,
+    /// The initial file loaded at startup (typically FHUI.smf from a ZIP).
+    /// Set to None when the user loaded a game directly (not from a menu).
+    /// Used to support "return to menu" on ESC.
+    pub initial_file: Option<PathBuf>,
+    /// Temporary directory handle for ZIP extraction. When this field is
+    /// dropped (e.g. when the Emulator is dropped), the directory is deleted.
+    _temp_dir: Option<tempfile::TempDir>,
 }
 
 impl Emulator {
     /// Create a new emulator from a game file path.
+    ///
+    /// Supports .smf, .sgm, .ssl, and .zip files. For .zip files, extracts
+    /// the archive and loads FHUI.smf (main menu) from the extracted directory.
     pub fn from_path(path: PathBuf, volume: u32) -> Result<Self> {
-        let data = std::fs::read(&path)
-            .with_context(|| format!("Failed to read game file: {}", path.display()))?;
+        // Check if this is a ZIP file
+        let is_zip = is_zip_file(&path);
+        let (game_path, _temp_dir) = if is_zip {
+            let (td, p) = crate::archive_loader::load_zip_game(&path)?;
+            (p, Some(td))
+        } else {
+            (path, None)
+        };
+
+        let data = std::fs::read(&game_path)
+            .with_context(|| format!("Failed to read game file: {}", game_path.display()))?;
 
         let mut reader = Native32Reader::new(data);
         reader.init().context("Failed to initialize game file")?;
@@ -56,10 +75,18 @@ impl Emulator {
         let resolution = reader.resolution;
         let colorspace = reader.colorspace;
 
-        let save_manager = SaveManager::new(&path);
+        let save_manager = SaveManager::new(&game_path);
+
+        // When loaded from a ZIP, remember the FHUI.smf path so pressing ESC
+        // in a game returns to the menu instead of exiting.
+        let initial_file = if is_zip {
+            Some(game_path.clone())
+        } else {
+            None
+        };
 
         Ok(Self {
-            filename: path,
+            filename: game_path,
             reader,
             sprites: SpriteSystem::new(),
             frame_player: FramePlayer::new(),
@@ -76,6 +103,8 @@ impl Emulator {
             time_ms: 0,
             pending_videos: Vec::new(),
             video_player: None,
+            initial_file,
+            _temp_dir,
         })
     }
 
@@ -90,6 +119,43 @@ impl Emulator {
             crate::file_loader::Colorspace::YUV => 11025.0,
             crate::file_loader::Colorspace::ARGB => 22050.0,
         }
+    }
+
+    /// Whether the emulator can return to an initial menu (e.g. FHUI.smf).
+    /// Returns true only when an initial menu file was set (ZIP mode) and the
+    /// current file is different (i.e. we are in a game, not already on the menu).
+    pub fn can_return_to_menu(&self) -> bool {
+        self.initial_file
+            .as_ref()
+            .is_some_and(|p| *p != self.filename)
+    }
+
+    /// Reload the emulator from the given file path, performing a full state
+    /// reset. Preserves `initial_file` so the user can return to the menu again.
+    pub fn reload_from_path(&mut self, path: PathBuf) -> Result<()> {
+        let data = std::fs::read(&path)
+            .with_context(|| format!("Failed to read game file: {}", path.display()))?;
+
+        self.audio.stop_all();
+        self.renderer.clear_sprite_overrides();
+        self.pending_videos.clear();
+        self.video_player = None;
+        self.tick_count = 0;
+        self.time_ms = 0;
+        self.sprites = SpriteSystem::new();
+        self.frame_player = FramePlayer::new();
+        self.vm = ActionVM::new();
+        self.content_loader = ContentLoader::new();
+        self.cur_frame_objects.clear();
+        self.menu_context = None;
+
+        self.filename = path;
+        self.reader = Native32Reader::new(data);
+        self.reader.init()?;
+        self.audio = AudioEngine::new(self.reader.colorspace, (self.audio.volume * 100.0) as u32);
+        self.save_manager = SaveManager::new(&self.filename);
+
+        Ok(())
     }
 
     /// Set button state from libretro input.
@@ -865,4 +931,26 @@ fn normalize_content_path(filename: &str) -> String {
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join("/")
+}
+
+/// Check if a file is a ZIP archive by reading its magic bytes.
+///
+/// ZIP files start with "PK\x03\x04" (local file header signature).
+fn is_zip_file(path: &PathBuf) -> bool {
+    // First check the extension
+    if let Some(ext) = path.extension() {
+        if ext.to_string_lossy().eq_ignore_ascii_case("zip") {
+            return true;
+        }
+    }
+
+    // Fallback: check magic bytes
+    if let Ok(mut file) = std::fs::File::open(path) {
+        let mut magic = [0u8; 4];
+        if std::io::Read::read_exact(&mut file, &mut magic).is_ok() {
+            return magic == [0x50, 0x4B, 0x03, 0x04]; // PK\x03\x04
+        }
+    }
+
+    false
 }
