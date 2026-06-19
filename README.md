@@ -119,8 +119,11 @@ The binary is produced at `target/release/native32-emu`.
 cargo build -p native32emu-libretro --release
 ```
 
-This produces `native32emu_libretro.dll` on Windows (`libnative32emu_libretro.so`
-on Linux, `libnative32emu_libretro.dylib` on macOS) under `target/release/`.
+Cargo names the cdylib after its lib target, so this produces `native32emu.dll`
+on Windows (`libnative32emu.so` on Linux, `libnative32emu.dylib` on macOS) under
+`target/release/`. RetroArch expects the core file to be named
+`native32emu_libretro.<ext>`, so rename it accordingly before dropping it into
+RetroArch's `cores/` directory.
 
 For Android cross-compilation, see [Android Libretro Core](docs/Android-Libretro-Core.md).
 
@@ -128,13 +131,12 @@ For Android cross-compilation, see [Android Libretro Core](docs/Android-Libretro
 
 To make the core installable directly from RetroArch (Online Updater > Core
 Downloader), it needs to be added to the Libretro build infrastructure. The
-repository ships the two files the buildbot requires:
-
-- `Makefile` — wraps `cargo build` so the buildbot's `make` invocation produces
-  `native32emu_libretro.<ext>` (it maps the libretro `platform`/`arch`
-  variables to the matching Rust target triple for cross-compilation).
-- `.gitlab-ci.yml` — the buildbot recipe that builds the core for Windows,
-  Linux and macOS using the official `libretro-infrastructure/ci-templates`.
+repository ships a `.gitlab-ci.yml` buildbot recipe. As Native32Emu is written
+in Rust, it uses the official Rust CI templates (`rust-windows-x64`,
+`rust-linux-x64`, `rust-apple`, `rust-android-jni`) from
+`libretro-infrastructure/ci-templates`, which run
+`cargo build --release --target <triple>` and rename the cdylib to
+`native32emu_libretro.<ext>`.
 
 Remaining steps (done against Libretro's own repositories):
 

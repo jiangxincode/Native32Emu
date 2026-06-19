@@ -5,6 +5,11 @@ members = [
     "crates/native32emu",
     "crates/native32emu-libretro",
 ]
+# The libretro buildbot runs a bare `cargo build --release --target <triple>` at
+# the repo root. Restrict the default build set to the libretro core so the CI
+# does not try to cross-compile the standalone GUI binary (minifb/rodio, which
+# need X11/ALSA). Explicit `-p` / `--workspace` selections are unaffected.
+default-members = ["crates/native32emu-libretro"]
 
 [workspace.package]
 version = "0.1.0"
