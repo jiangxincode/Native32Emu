@@ -14,6 +14,3 @@ reloading the game.
 
 The auto-repeat options reproduce the original keypad's typematic behavior that
 some games rely on (e.g. walk vs. run on a held direction).
-
-Every core option has an equivalent standalone command-line flag. See
-[Command-line Options](CLI-Options.md) for the standalone equivalents.
