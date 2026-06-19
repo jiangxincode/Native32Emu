@@ -10,8 +10,9 @@ use std::path::{Path, PathBuf};
 
 /// Extract a ZIP archive to a temporary directory and return the path.
 ///
-/// The caller is responsible for cleaning up the returned directory when done.
-pub fn extract_zip(zip_path: &Path) -> Result<PathBuf> {
+/// The `TempDir` handle is returned alongside the path so the caller can keep
+/// it alive — the directory is automatically deleted when the handle is dropped.
+pub fn extract_zip(zip_path: &Path) -> Result<(tempfile::TempDir, PathBuf)> {
     let file = fs::File::open(zip_path)
         .with_context(|| format!("Failed to open ZIP file: {}", zip_path.display()))?;
 
@@ -21,7 +22,7 @@ pub fn extract_zip(zip_path: &Path) -> Result<PathBuf> {
     // Create a temporary directory for extraction
     let temp_dir =
         tempfile::tempdir().context("Failed to create temporary directory for ZIP extraction")?;
-    let extract_path = temp_dir.keep();
+    let extract_path = temp_dir.path().to_path_buf();
 
     // Extract all files from the archive
     for i in 0..archive.len() {
@@ -54,7 +55,7 @@ pub fn extract_zip(zip_path: &Path) -> Result<PathBuf> {
             .with_context(|| format!("Failed to extract file: {}", outpath.display()))?;
     }
 
-    Ok(extract_path)
+    Ok((temp_dir, extract_path))
 }
 
 /// Find the FHUI.smf (main menu) file in an extracted directory.
@@ -84,23 +85,22 @@ pub fn find_fhui_in_directory(dir: &Path) -> Option<PathBuf> {
 
 /// Process a ZIP file: extract it and find the FHUI.smf entry point.
 ///
-/// Returns the path to the extracted FHUI.smf file, or an error if:
-/// - The ZIP cannot be extracted
-/// - No FHUI.smf is found in the archive
-pub fn load_zip_game(zip_path: &Path) -> Result<PathBuf> {
+/// Returns the `TempDir` handle (keep it alive to preserve the directory) and
+/// the path to the extracted FHUI.smf file. The directory is automatically
+/// deleted when the `TempDir` is dropped.
+pub fn load_zip_game(zip_path: &Path) -> Result<(tempfile::TempDir, PathBuf)> {
     log::info!("Extracting ZIP archive: {}", zip_path.display());
 
-    let extract_path = extract_zip(zip_path)?;
+    let (temp_dir, extract_path) = extract_zip(zip_path)?;
 
     // Find FHUI.smf in the extracted directory
     match find_fhui_in_directory(&extract_path) {
         Some(fhui_path) => {
             log::info!("Found FHUI.smf: {}", fhui_path.display());
-            Ok(fhui_path)
+            Ok((temp_dir, fhui_path))
         }
         None => {
-            // Clean up the temporary directory
-            let _ = fs::remove_dir_all(&extract_path);
+            // temp_dir is dropped here, automatically cleaning up the directory
             anyhow::bail!("No FHUI.smf found in ZIP archive: {}", zip_path.display());
         }
     }
@@ -123,9 +123,7 @@ mod tests {
 
         let result = extract_zip(&zip_path);
         assert!(result.is_ok());
-
-        // Clean up
-        let _ = fs::remove_dir_all(result.unwrap());
+        // TempDir cleans up automatically when dropped
     }
 
     #[test]
@@ -146,11 +144,9 @@ mod tests {
         let result = extract_zip(&zip_path);
         assert!(result.is_ok());
 
-        let extract_path = result.unwrap();
+        let (_temp_dir, extract_path) = result.unwrap();
         assert!(extract_path.join("FHUI.smf").exists());
-
-        // Clean up
-        let _ = fs::remove_dir_all(extract_path);
+        // TempDir cleans up automatically when dropped
     }
 
     #[test]
@@ -212,12 +208,10 @@ mod tests {
         let result = load_zip_game(&zip_path);
         assert!(result.is_ok());
 
-        let fhui_path = result.unwrap();
+        let (_temp_dir, fhui_path) = result.unwrap();
         assert!(fhui_path.exists());
         assert_eq!(fhui_path.file_name().unwrap().to_str().unwrap(), "FHUI.smf");
-
-        // Clean up
-        let _ = fs::remove_dir_all(fhui_path.parent().unwrap());
+        // TempDir cleans up automatically when dropped
     }
 
     #[test]
@@ -261,8 +255,6 @@ mod tests {
 
         let result = load_zip_game(&zip_path);
         assert!(result.is_ok());
-
-        // Clean up
-        let _ = fs::remove_dir_all(result.unwrap().parent().unwrap());
+        // TempDir cleans up automatically when dropped
     }
 }

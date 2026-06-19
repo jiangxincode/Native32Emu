@@ -46,6 +46,9 @@ pub struct Emulator {
     /// Set to None when the user loaded a game directly (not from a menu).
     /// Used to support "return to menu" on ESC.
     pub initial_file: Option<PathBuf>,
+    /// Temporary directory handle for ZIP extraction. When this field is
+    /// dropped (e.g. when the Emulator is dropped), the directory is deleted.
+    _temp_dir: Option<tempfile::TempDir>,
 }
 
 impl Emulator {
@@ -56,10 +59,11 @@ impl Emulator {
     pub fn from_path(path: PathBuf, volume: u32) -> Result<Self> {
         // Check if this is a ZIP file
         let is_zip = is_zip_file(&path);
-        let game_path = if is_zip {
-            crate::archive_loader::load_zip_game(&path)?
+        let (game_path, _temp_dir) = if is_zip {
+            let (td, p) = crate::archive_loader::load_zip_game(&path)?;
+            (p, Some(td))
         } else {
-            path
+            (path, None)
         };
 
         let data = std::fs::read(&game_path)
@@ -100,6 +104,7 @@ impl Emulator {
             pending_videos: Vec::new(),
             video_player: None,
             initial_file,
+            _temp_dir,
         })
     }
 
