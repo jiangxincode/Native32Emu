@@ -129,27 +129,10 @@ For Android cross-compilation, see [Android Libretro Core](docs/Android-Libretro
 
 #### Distributing via RetroArch's Online Updater
 
-To make the core installable directly from RetroArch (Online Updater > Core
-Downloader), it needs to be added to the Libretro build infrastructure. The
-repository ships a `.gitlab-ci.yml` buildbot recipe. As Native32Emu is written
-in Rust, it uses the official Rust CI templates (`rust-windows-x64`,
-`rust-linux-x64`, `rust-apple`, `rust-android-jni`) from
-`libretro-infrastructure/ci-templates`, which run
-`cargo build --release --target <triple>` and rename the cdylib to
-`native32emu_libretro.<ext>`.
-
-Remaining steps (done against Libretro's own repositories):
-
-1. Submit `crates/native32emu-libretro/native32emu_libretro.info` to the
-   [libretro-super `dist/info`](https://github.com/libretro/libretro-super/tree/master/dist/info)
-   directory via a pull request.
-2. Ask the Libretro team to register this repository's `.gitlab-ci.yml` recipe
-   so the buildbot starts building the core (see the
-   [forum thread on adding a new core](https://forums.libretro.com/t/i-have-a-new-core-what-to-do/37582)).
-3. (Optional, for playlists) add core icons to
-   [retroarch-assets](https://github.com/libretro/retroarch-assets) and game
-   entries to the [libretro-database](https://github.com/libretro/libretro-database).
-4. (Optional) add core documentation to [libretro/docs](https://github.com/libretro/docs#adding-a-new-core).
+Work to make the core installable directly from RetroArch (Online Updater > Core
+Downloader) — the buildbot recipe, the `libretro-super` info file, documentation,
+and their current status — is tracked in
+[issue #20](https://github.com/jiangxincode/Native32Emu/issues/20).
 
 ## Testing
 
