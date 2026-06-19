@@ -48,6 +48,11 @@ native32-emu path/to/game.zip
 native32-emu --fullscreen game.smf
 ```
 
+**ZIP mode**: When loading from a `.zip` file, the emulator starts the FHUI
+menu. Selecting a game launches it; pressing **ESC** during gameplay returns to
+the menu. Pressing ESC on the menu itself exits the emulator. When loading a
+`.smf` file directly, ESC exits as usual.
+
 ### RetroArch Mode
 
 Native32Emu can be used as a libretro core with RetroArch, allowing you to play Native32 games with RetroArch's features like shaders, netplay, and achievements.
