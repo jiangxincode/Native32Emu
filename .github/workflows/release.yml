@@ -62,10 +62,14 @@ jobs:
           out="libretro/${{ matrix.artifact }}"
           mkdir -p "$out"
           rel="target/${{ matrix.target }}/release"
-          # The cdylib is already named native32emu_libretro.<ext> by Cargo.
-          for f in "native32emu_libretro.dll" "libnative32emu_libretro.so" "libnative32emu_libretro.dylib"; do
-            if [ -f "$rel/$f" ]; then
-              cp "$rel/$f" "$out/"
+          # Cargo names the cdylib after its lib target (native32emu); copy it
+          # to the native32emu_libretro.<ext> name RetroArch expects.
+          for f in "native32emu.dll:native32emu_libretro.dll" \
+                   "libnative32emu.so:native32emu_libretro.so" \
+                   "libnative32emu.dylib:native32emu_libretro.dylib"; do
+            src="${f%%:*}"; dst="${f##*:}"
+            if [ -f "$rel/$src" ]; then
+              cp "$rel/$src" "$out/$dst"
               break
             fi
           done
@@ -161,7 +165,7 @@ jobs:
             triple="${ABI_TRIPLE[$abi]}"
             out="libretro/native32-emu-android/$abi"
             mkdir -p "$out"
-            cp "target/$triple/release/libnative32emu_libretro.so" \
+            cp "target/$triple/release/libnative32emu.so" \
                "$out/native32emu_libretro_android.so"
           done
           cp crates/native32emu-libretro/native32emu_libretro.info \

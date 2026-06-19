@@ -6,9 +6,12 @@ description = "libretro core for Native32Emu (loadable by RetroArch)"
 license.workspace = true
 
 [lib]
-# Produces native32emu_libretro.{dll,so,dylib} directly, named the way
-# RetroArch expects, so no post-build renaming is needed.
-name = "native32emu_libretro"
+# The libretro buildbot's official Rust CI templates build with
+# `cargo build --release` and then rename the cdylib by appending `_libretro`
+# (e.g. libnative32emu.so -> native32emu_libretro.so), so the lib target is
+# named `native32emu` (matching CORENAME in .gitlab-ci.yml). For local RetroArch
+# installs, rename the produced cdylib to native32emu_libretro.<ext> manually.
+name = "native32emu"
 crate-type = ["cdylib"]
 path = "src/lib.rs"
 

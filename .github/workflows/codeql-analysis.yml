@@ -40,7 +40,7 @@ jobs:
           languages: ${{ matrix.language }}
 
       - name: Build
-        run: cargo build
+        run: cargo build --workspace
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
