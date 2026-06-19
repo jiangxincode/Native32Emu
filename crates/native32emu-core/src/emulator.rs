@@ -42,6 +42,10 @@ pub struct Emulator {
     pub pending_videos: Vec<String>,
     /// Active cutscene player, if a video is currently playing.
     pub video_player: Option<crate::mpeg::VideoPlayer>,
+    /// The initial file loaded at startup (typically FHUI.smf from a ZIP).
+    /// Set to None when the user loaded a game directly (not from a menu).
+    /// Used to support "return to menu" on ESC.
+    pub initial_file: Option<PathBuf>,
 }
 
 impl Emulator {
@@ -51,7 +55,8 @@ impl Emulator {
     /// the archive and loads FHUI.smf (main menu) from the extracted directory.
     pub fn from_path(path: PathBuf, volume: u32) -> Result<Self> {
         // Check if this is a ZIP file
-        let game_path = if is_zip_file(&path) {
+        let is_zip = is_zip_file(&path);
+        let game_path = if is_zip {
             crate::archive_loader::load_zip_game(&path)?
         } else {
             path
@@ -67,6 +72,14 @@ impl Emulator {
         let colorspace = reader.colorspace;
 
         let save_manager = SaveManager::new(&game_path);
+
+        // When loaded from a ZIP, remember the FHUI.smf path so pressing ESC
+        // in a game returns to the menu instead of exiting.
+        let initial_file = if is_zip {
+            Some(game_path.clone())
+        } else {
+            None
+        };
 
         Ok(Self {
             filename: game_path,
@@ -86,6 +99,7 @@ impl Emulator {
             time_ms: 0,
             pending_videos: Vec::new(),
             video_player: None,
+            initial_file,
         })
     }
 
@@ -100,6 +114,43 @@ impl Emulator {
             crate::file_loader::Colorspace::YUV => 11025.0,
             crate::file_loader::Colorspace::ARGB => 22050.0,
         }
+    }
+
+    /// Whether the emulator can return to an initial menu (e.g. FHUI.smf).
+    /// Returns true only when an initial menu file was set (ZIP mode) and the
+    /// current file is different (i.e. we are in a game, not already on the menu).
+    pub fn can_return_to_menu(&self) -> bool {
+        self.initial_file
+            .as_ref()
+            .is_some_and(|p| *p != self.filename)
+    }
+
+    /// Reload the emulator from the given file path, performing a full state
+    /// reset. Preserves `initial_file` so the user can return to the menu again.
+    pub fn reload_from_path(&mut self, path: PathBuf) -> Result<()> {
+        let data = std::fs::read(&path)
+            .with_context(|| format!("Failed to read game file: {}", path.display()))?;
+
+        self.audio.stop_all();
+        self.renderer.clear_sprite_overrides();
+        self.pending_videos.clear();
+        self.video_player = None;
+        self.tick_count = 0;
+        self.time_ms = 0;
+        self.sprites = SpriteSystem::new();
+        self.frame_player = FramePlayer::new();
+        self.vm = ActionVM::new();
+        self.content_loader = ContentLoader::new();
+        self.cur_frame_objects.clear();
+        self.menu_context = None;
+
+        self.filename = path;
+        self.reader = Native32Reader::new(data);
+        self.reader.init()?;
+        self.audio = AudioEngine::new(self.reader.colorspace, (self.audio.volume * 100.0) as u32);
+        self.save_manager = SaveManager::new(&self.filename);
+
+        Ok(())
     }
 
     /// Set button state from libretro input.
