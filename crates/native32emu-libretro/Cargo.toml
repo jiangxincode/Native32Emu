@@ -10,7 +10,7 @@ license.workspace = true
 # `cargo build --release` and then rename the cdylib by appending `_libretro`
 # (e.g. libnative32emu.so -> native32emu_libretro.so), so the lib target is
 # named `native32emu` (matching CORENAME in .gitlab-ci.yml). For local RetroArch
-# installs use the Makefile (or rename manually) to get the *_libretro name.
+# installs, rename the produced cdylib to native32emu_libretro.<ext> manually.
 name = "native32emu"
 crate-type = ["cdylib"]
 path = "src/lib.rs"
