@@ -62,6 +62,19 @@ pub enum retro_pixel_format {
     RETRO_PIXEL_FORMAT_RGB565 = 2,
 }
 
+/// Core option variable, used by RETRO_ENVIRONMENT_SET_VARIABLES and
+/// RETRO_ENVIRONMENT_GET_VARIABLE.
+///
+/// For SET_VARIABLES, `value` holds the human-readable description followed by
+/// "; " and a pipe-separated list of allowed values, the first of which is the
+/// default (e.g. "Audio Volume; 100|90|80"). For GET_VARIABLE, the core sets
+/// `key` and the frontend fills in `value` with the user's current selection.
+#[repr(C)]
+pub struct retro_variable {
+    pub key: *const c_char,
+    pub value: *const c_char,
+}
+
 /// Input descriptor
 #[repr(C)]
 pub struct retro_input_descriptor {
