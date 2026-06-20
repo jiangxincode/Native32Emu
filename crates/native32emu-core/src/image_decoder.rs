@@ -126,10 +126,10 @@ pub fn decode_image_yuv(data: &[u8]) -> Option<RgbaImage> {
             set_y(2 * x_coord, 2 * y_coord + 1, chunk[1]);
             set_y(2 * x_coord + 1, 2 * y_coord, chunk[2]);
             set_y(2 * x_coord + 1, 2 * y_coord + 1, chunk[3]);
-            // V is byte 4, U is byte 5
+            // U (Cb) is byte 4, V (Cr) is byte 5
             if pix < v_buf.len() {
-                v_buf[pix] = chunk[4];
-                u_buf[pix] = chunk[5];
+                u_buf[pix] = chunk[4];
+                v_buf[pix] = chunk[5];
             }
         };
 
@@ -414,9 +414,9 @@ mod tests {
         data[2..4].copy_from_slice(&2u16.to_le_bytes()); // height
         data[4..8].copy_from_slice(&14u32.to_le_bytes()); // data size
         data[8..10].copy_from_slice(&0x8002u16.to_le_bytes()); // literal: 2 quads
-                                                               // quad 0: opaque luma + cream chroma (V=133, U=108)
+                                                               // quad 0: opaque luma + chroma (U=133, V=108)
         data[10..16].copy_from_slice(&[200, 200, 200, 200, 133, 108]);
-        // quad 1: opaque luma + bluish chroma (V=120, U=160)
+        // quad 1: opaque luma + chroma (U=120, V=160)
         data[16..22].copy_from_slice(&[200, 200, 200, 200, 120, 160]);
 
         let img = decode_image_yuv(&data).expect("decode");
@@ -455,13 +455,13 @@ mod tests {
 
         // Command: literal 1 quad (0x8000 | 1 = 0x8001)
         data[8..10].copy_from_slice(&0x8001u16.to_le_bytes());
-        // 6 bytes of YUV data: Y0, Y1, Y2, Y3, V, U
+        // 6 bytes of YUV data: Y0, Y1, Y2, Y3, U, V
         data[10] = 128; // Y0
         data[11] = 128; // Y1
         data[12] = 128; // Y2
         data[13] = 128; // Y3
-        data[14] = 128; // V
-        data[15] = 128; // U
+        data[14] = 128; // U
+        data[15] = 128; // V
 
         let result = decode_image_yuv(&data);
         assert!(result.is_some());
