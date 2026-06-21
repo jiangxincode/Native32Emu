@@ -135,13 +135,6 @@ RetroArch's `cores/` directory.
 
 For Android cross-compilation, see [Android Libretro Core](docs/Android-Libretro-Core.md).
 
-#### Distributing via RetroArch's Online Updater
-
-Work to make the core installable directly from RetroArch (Online Updater > Core
-Downloader) — the buildbot recipe, the `libretro-super` info file, documentation,
-and their current status — is tracked in
-[issue #20](https://github.com/jiangxincode/Native32Emu/issues/20).
-
 ## Testing
 
 Run the unit tests:
