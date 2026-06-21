@@ -448,10 +448,6 @@ mod tests {
 
     // === Helper functions ===
 
-    fn parse_float(s: &str) -> f64 {
-        s.parse::<f64>().unwrap_or(0.0)
-    }
-
     /// Mock VmHost that records calls for verification.
     struct MockHost {
         stopped: bool,
