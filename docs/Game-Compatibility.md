@@ -120,16 +120,3 @@ All 84 Native32 games in the test suite load and run without fatal errors. Each 
 | 2 | 幸运宝盒 | Lucky Box | tmp/native32_game/ETAB/LuckyBox.smf | ![幸运宝盒](images/ETAB/LuckyBox.png) | 由苹果机、单人梭哈、赌骰子 3 种赌博小游戏组成的棋牌类游戏。苹果机中对水果下注，不同水果有不同赔率。 | ✅ Pass |
 | 3 | 天堂 777 | Paradise 777 | tmp/native32_game/ETAB/Parad777.smf | ![天堂777](images/ETAB/Parad777.png) | 模拟老虎机的游戏，游戏获胜机率从开始高到后来很低。在游戏期间玩家可获得一定的道具，并具有特殊效果。 | ✅ Pass |
 | 4 | 长空斗士 | Sky Fighter | tmp/native32_game/ETAB/SkyFight.smf | ![长空斗士](images/ETAB/SkyFight.png) | 类似于飞行棋的游戏，游戏中需要掷出骰子，得到点数，选择行动的飞机，飞机按点数行走。只有掷出 6 点，才能将一架新的飞机由机场出发。 | ✅ Pass |
-
-## Summary
-
-| Category | Count | Passed | Failed |
-|----------|-------|--------|--------|
-| Main Menu | 1 | 1 | 0 |
-| EACT (Action) | 11 | 11 | 0 |
-| EELA (Educational) | 32 | 32 | 0 |
-| EPOP (Hot/Featured) | 9 | 9 | 0 |
-| EPUZ (Puzzle) | 24 | 24 | 0 |
-| ESPG (Sport) | 3 | 3 | 0 |
-| ETAB (Chess/Board) | 4 | 4 | 0 |
-| **Total** | **84** | **84** | **0** |

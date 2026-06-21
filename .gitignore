@@ -3,6 +3,7 @@ tmp/
 target/
 .codegraph/
 .claude/
+CLAUDE.md
 
 # Locally built/renamed libretro core artifacts in the repo root
 /native32emu_libretro.dll
