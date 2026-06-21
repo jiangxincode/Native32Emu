@@ -31,8 +31,8 @@ All 84 Native32 games in the test suite load and run without fatal errors. Each 
 | 1 | 加 21 | Adding 21 | tmp/native32_game/EELA/Adding21.smf | ![加21](images/EELA/Adding21.png) | 数学加法练习游戏，通过趣味互动学习加法运算。 | ✅ Pass |
 | 2 | 字母排序 | Alphabetical Order | tmp/native32_game/EELA/AlpOrder.smf | ![字母排序](images/EELA/AlpOrder.png) | 字母排序学习游戏，练习英文字母的正确顺序。 | ✅ Pass |
 | 3 | 动物朋友 | Animal Friends | tmp/native32_game/EELA/AnimalFr.smf | ![动物朋友](images/EELA/AnimalFr.png) | 动物认知学习游戏，认识各种动物朋友。 | ✅ Pass |
-| 4 | 动物一 | Animals 1 | tmp/native32_game/EELA/Animals1.smf | ![动物一](images/EELA/Animals1.png) | 水果认知学习游戏（第二辑），通过图片认识各种水果。 | ✅ Pass |
-| 5 | 动物二 | Animals 2 | tmp/native32_game/EELA/Animals2.smf | ![动物二](images/EELA/Animals2.png) | 水果认知学习游戏，通过图片认识各种水果。 | ✅ Pass |
+| 4 | 动物一 | Animals 1 | tmp/native32_game/EELA/Animals1.smf | ![动物一](images/EELA/Animals1.png) | 动物认知学习游戏，通过图片认识各种动物。 | ✅ Pass |
+| 5 | 动物二 | Animals 2 | tmp/native32_game/EELA/Animals2.smf | ![动物二](images/EELA/Animals2.png) | 动物认知学习游戏（第二辑），认识更多种类的动物。 | ✅ Pass |
 | 6 | 小鸡回家 | Chicklin | tmp/native32_game/EELA/Chicklin.smf | ![小鸡回家](images/EELA/Chicklin.png) | 关于简单加减乘除运算正误判断的练习，适合多个年龄层幼儿，判断数学等式是否正确。 | ✅ Pass |
 | 7 | 颜色魔法 | Colors Magic | tmp/native32_game/EELA/ColorsMa.smf | ![颜色魔法](images/EELA/ColorsMa.png) | 颜色配对学习游戏，通过匹配颜色学习辨识不同色彩。 | ✅ Pass |
 | 8 | 阅读理解 | Comprehension | tmp/native32_game/EELA/Comprehe.smf | ![阅读理解](images/EELA/Comprehe.png) | 阅读理解练习游戏，通过阅读短文回答问题，提升阅读能力。 | ✅ Pass |
