@@ -12,7 +12,6 @@
 
 - **Game compatibility testing** — test more games and report issues with screenshots
 - **VM opcode implementation** — some rare opcodes are not yet fully implemented
-- **Audio/video support** — `.mpg` video playback is not yet supported
 - **Platform ports** — macOS and Linux testing and packaging
 - **Documentation** — improve docs and code comments
 - **Bug reports** — if you find a game that doesn't work correctly, please open an issue
