@@ -31,6 +31,6 @@ cargo ndk -t arm64-v8a -t armeabi-v7a -t x86 -t x86_64 -p 21 \
   build -p native32emu-libretro --release
 ```
 
-Each ABI produces `libnative32emu_libretro.so`; rename it to
+Each ABI produces `libnative32emu.so`; rename it to
 `native32emu_libretro_android.so` when installing into RetroArch on Android.
 The CI release workflow performs this packaging automatically.
