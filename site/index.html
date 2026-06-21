@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Native32 Emulator — 让尘封的芯片游戏重获新生</title>
+  <meta name="description" content="用 Rust 编写的 Native32 游戏模拟器，支持 84 款经典芯片游戏，兼容 RetroArch">
+  <link rel="icon" type="image/png" href="res/logo.png">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <!-- ====== NAV ====== -->
+  <nav id="navbar">
+    <div class="nav-inner">
+      <a href="#hero" class="nav-logo">
+        <img src="res/logo.png" alt="Native32Emu" width="32" height="32">
+        <span>Native32Emu</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features" data-i18n="nav-features">核心特性</a>
+        <a href="#gallery" data-i18n="nav-games">游戏库</a>
+        <a href="#architecture" data-i18n="nav-arch">技术架构</a>
+        <a href="#quickstart" data-i18n="nav-quickstart">快速开始</a>
+        <button id="lang-toggle" class="lang-toggle" aria-label="Switch language">EN</button>
+        <a href="https://github.com/jiangxincode/Native32Emu" class="nav-github" target="_blank">
+          <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+        </a>
+      </div>
+      <button class="nav-toggle" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ====== HERO ====== -->
+  <section id="hero">
+    <div class="hero-bg">
+      <canvas id="circuit-canvas"></canvas>
+    </div>
+    <div class="hero-content">
+      <div class="hero-chip">
+        <img src="res/logo.svg" alt="Native32Emu Logo" class="hero-logo">
+      </div>
+      <h1 class="hero-title">
+        <span class="hero-title-line">Native32</span>
+        <span class="hero-title-line accent">Emulator</span>
+      </h1>
+      <p class="hero-subtitle" data-i18n="hero-subtitle">让尘封的芯片游戏重获新生</p>
+      <p class="hero-desc" data-i18n="hero-desc">用 Rust 编写的 Native32 游戏模拟器，完整支持 Sunplus DVD 芯片上的 84 款经典游戏</p>
+      <div class="hero-badges">
+        <img src="https://img.shields.io/github/v/release/jiangxincode/Native32Emu?style=for-the-badge" alt="Release">
+        <img src="https://img.shields.io/badge/license-BSD%203--Clause-blue?style=for-the-badge" alt="License">
+        <img src="https://img.shields.io/github/downloads/jiangxincode/Native32Emu/total?style=for-the-badge&label=downloads" alt="Downloads">
+        <img src="https://sonarcloud.io/api/project_badges/measure?project=jiangxincode_Native32Emu&metric=alert_status&style=for-the-badge" alt="Quality Gate">
+      </div>
+      <div class="hero-actions">
+        <a href="https://github.com/jiangxincode/Native32Emu/releases/latest" class="btn btn-primary" target="_blank">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M2.75 14A1.75 1.75 0 011 12.25v-2.5a.75.75 0 011.5 0v2.5c0 .138.112.25.25.25h10.5a.25.25 0 00.25-.25v-2.5a.75.75 0 011.5 0v2.5A1.75 1.75 0 0113.25 14H2.75z"/><path d="M7.25 7.689V2a.75.75 0 011.5 0v5.689l1.97-1.969a.749.749 0 111.06 1.06l-3.25 3.25a.749.749 0 01-1.06 0L4.22 6.78a.749.749 0 111.06-1.06l1.97 1.969z"/></svg>
+          <span data-i18n="hero-download">下载</span>
+        </a>
+        <a href="https://github.com/jiangxincode/Native32Emu" class="btn btn-secondary" target="_blank">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+          <span data-i18n="hero-github">查看源码</span>
+        </a>
+      </div>
+    </div>
+    <div class="hero-scroll">
+      <span data-i18n="hero-scroll">向下滚动探索</span>
+      <div class="scroll-arrow"></div>
+    </div>
+  </section>
+
+  <!-- ====== ABOUT ====== -->
+  <section id="about" class="section">
+    <div class="container">
+      <div class="about-grid">
+        <div class="about-text fade-in-up">
+          <h2 data-i18n="about-title">什么是 Native32？</h2>
+          <p data-i18n="about-p1">Native32 是 <strong>Sunplus</strong> 公司为 DVD 播放器和电视芯片（约 2005–2011 年）开发的游戏格式。游戏运行在芯片内置的栈式虚拟机上，使用类 ActionScript 的字节码，配合光栅图形和 MP3/MPEG-1 多媒体。</p>
+          <p data-i18n="about-p2">这些曾经只能在特定硬件上运行的游戏，如今通过 Native32Emu 在现代设备上重获新生。</p>
+        </div>
+        <div class="about-diagram fade-in-up">
+          <div class="diagram-flow">
+            <div class="diagram-node">
+              <div class="diagram-icon chip-icon"></div>
+              <span data-i18n="about-chip">Sunplus 芯片</span>
+              <small data-i18n="about-chip-sub">DVD / TV SoC</small>
+            </div>
+            <div class="diagram-arrow">→</div>
+            <div class="diagram-node">
+              <div class="diagram-icon game-icon"></div>
+              <span>.smf / .ssl</span>
+              <small data-i18n="about-game-sub">Native32 游戏</small>
+            </div>
+            <div class="diagram-arrow">→</div>
+            <div class="diagram-node highlight">
+              <div class="diagram-icon emu-icon"></div>
+              <span>Native32Emu</span>
+              <small data-i18n="about-emu-sub">Rust 模拟器</small>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== STATS ====== -->
+  <section id="stats" class="section section-dark">
+    <div class="container">
+      <div class="stats-grid">
+        <div class="stat-item fade-in-up">
+          <div class="stat-number" data-target="84">0</div>
+          <div class="stat-label" data-i18n="stat-games">支持游戏</div>
+          <div class="stat-sub" data-i18n="stat-games-sub">100% 兼容</div>
+        </div>
+        <div class="stat-item fade-in-up">
+          <div class="stat-number" data-target="36">0</div>
+          <div class="stat-label" data-i18n="stat-opcodes">VM 操作码</div>
+          <div class="stat-sub" data-i18n="stat-opcodes-sub">类 ActionScript 虚拟机</div>
+        </div>
+        <div class="stat-item fade-in-up">
+          <div class="stat-number" data-target="4">0</div>
+          <div class="stat-label" data-i18n="stat-platforms">目标平台</div>
+          <div class="stat-sub" data-i18n="stat-platforms-sub">Windows / macOS / Linux / Android</div>
+        </div>
+        <div class="stat-item fade-in-up">
+          <div class="stat-number" data-target="12000" data-suffix="+">0</div>
+          <div class="stat-label" data-i18n="stat-lines">Rust 代码行数</div>
+          <div class="stat-sub" data-i18n="stat-lines-sub">零 C 依赖</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== FEATURES ====== -->
+  <section id="features" class="section">
+    <div class="container">
+      <h2 class="section-title fade-in-up" data-i18n="feat-title">核心特性</h2>
+      <p class="section-subtitle fade-in-up" data-i18n="feat-subtitle">从字节码虚拟机到 MPEG-1 解码器，全栈 Rust 实现</p>
+      <div class="features-grid">
+        <div class="feature-card fade-in-up">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9l3 3-3 3"/><path d="M15 15l-3-3 3-3"/></svg>
+          </div>
+          <h3 data-i18n="feat-vm-title">Action 字节码虚拟机</h3>
+          <p data-i18n="feat-vm-desc">36 个操作码的栈式虚拟机，覆盖算术、逻辑、字符串、控制流、精灵和 I/O，完整还原 Native32 游戏脚本引擎。</p>
+        </div>
+        <div class="feature-card fade-in-up">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+          </div>
+          <h3 data-i18n="feat-mpeg-title">MPEG-1 解码器</h3>
+          <p data-i18n="feat-mpeg-desc">纯 Rust 移植 PL_MPEG，零 C 依赖的 MPEG-1 视频 + MP2 音频解码器，流畅播放过场动画。</p>
+        </div>
+        <div class="feature-card fade-in-up">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          </div>
+          <h3 data-i18n="feat-dual-title">双前端架构</h3>
+          <p data-i18n="feat-dual-desc">平台无关的核心引擎 + 独立的 Standalone 和 RetroArch 前端，共享 100% 模拟逻辑。</p>
+        </div>
+        <div class="feature-card fade-in-up">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 002 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          </div>
+          <h3 data-i18n="feat-zip-title">ZIP 包加载</h3>
+          <p data-i18n="feat-zip-desc">直接加载 .zip 游戏包，自动解压并启动 FHUI 主菜单，还原原始的游戏浏览体验。</p>
+        </div>
+        <div class="feature-card fade-in-up">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <h3 data-i18n="feat-des-title">DES 解密</h3>
+          <p data-i18n="feat-des-desc">实现完整的 DES ECB 头部解密，还原 Sunplus 自定义加密的游戏文件头。</p>
+        </div>
+        <div class="feature-card fade-in-up">
+          <div class="feature-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 12h4"/><path d="M14 12h4"/><path d="M8 10v4"/><path d="M16 10v4"/></svg>
+          </div>
+          <h3 data-i18n="feat-retro-title">RetroArch 核心</h3>
+          <p data-i18n="feat-retro-desc">完整的 libretro 核心，支持 RetroPad 映射、核心选项、着色器、网络对战等 RetroArch 生态功能。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== GAME GALLERY ====== -->
+  <section id="gallery" class="section section-dark">
+    <div class="container">
+      <h2 class="section-title fade-in-up" data-i18n="gallery-title">游戏库</h2>
+      <p class="section-subtitle fade-in-up" data-i18n="gallery-subtitle">84 款游戏，7 大分类，全部通过测试</p>
+      <div id="gallery-dynamic" class="fade-in-up"></div>
+    </div>
+  </section>
+
+  <!-- ====== ARCHITECTURE ====== -->
+  <section id="architecture" class="section">
+    <div class="container">
+      <h2 class="section-title fade-in-up" data-i18n="arch-title">技术架构</h2>
+      <p class="section-subtitle fade-in-up" data-i18n="arch-subtitle">清晰的三层架构，平台无关的核心引擎</p>
+      <div class="arch-diagram fade-in-up">
+        <div class="arch-layer arch-frontend">
+          <div class="arch-label" data-i18n="arch-frontends">前端</div>
+          <div class="arch-boxes">
+            <div class="arch-box">
+              <strong>native32emu</strong>
+              <small data-i18n="arch-standalone-sub">Standalone 可执行文件<br>minifb 窗口</small>
+            </div>
+            <div class="arch-box">
+              <strong>native32emu-libretro</strong>
+              <small data-i18n="arch-libretro-sub">libretro cdylib<br>RetroArch 核心</small>
+            </div>
+          </div>
+        </div>
+        <div class="arch-connector">
+          <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+            <path d="M20 0 L20 20 L50 40" stroke="#E8553A" stroke-width="2" fill="none"/>
+            <path d="M80 0 L80 20 L50 40" stroke="#E8553A" stroke-width="2" fill="none"/>
+          </svg>
+        </div>
+        <div class="arch-layer arch-core">
+          <div class="arch-label" data-i18n="arch-core">核心引擎</div>
+          <div class="arch-boxes">
+            <div class="arch-box core-box">
+              <strong>native32emu-core</strong>
+              <small data-i18n="arch-core-sub">平台无关的库</small>
+              <div class="core-modules">
+                <span>Action VM</span>
+                <span>Renderer</span>
+                <span>Audio</span>
+                <span>MPEG-1</span>
+                <span>Image Decoder</span>
+                <span>File Loader</span>
+                <span>Sprite System</span>
+                <span>DES Decrypt</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="arch-connector">
+          <svg viewBox="0 0 100 40" preserveAspectRatio="none">
+            <path d="M50 0 L50 40" stroke="#4ADE80" stroke-width="2" fill="none" stroke-dasharray="4,4"/>
+          </svg>
+        </div>
+        <div class="arch-layer arch-platform">
+          <div class="arch-label" data-i18n="arch-platforms">目标平台</div>
+          <div class="arch-boxes">
+            <div class="arch-box small-box">Windows</div>
+            <div class="arch-box small-box">macOS</div>
+            <div class="arch-box small-box">Linux</div>
+            <div class="arch-box small-box">Android</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== CODE SHOWCASE ====== -->
+  <section id="code" class="section section-dark">
+    <div class="container">
+      <h2 class="section-title fade-in-up" data-i18n="code-title">纯 Rust，零妥协</h2>
+      <p class="section-subtitle fade-in-up" data-i18n="code-subtitle">从 MPEG-1 解码到 DES 加密，全部用 Rust 从零实现</p>
+      <div class="code-showcase fade-in-up">
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-dot red"></span>
+            <span class="code-dot yellow"></span>
+            <span class="code-dot green"></span>
+            <span class="code-filename">action_vm.rs</span>
+          </div>
+          <pre><code><span class="kw">pub enum</span> <span class="type">Action</span> {
+    <span class="comment">// Arithmetic</span>
+    <span class="fn">Add</span>, <span class="fn">Sub</span>, <span class="fn">Mul</span>, <span class="fn">Div</span>, <span class="fn">Modulo</span>,
+    <span class="comment">// Comparison</span>
+    <span class="fn">Less</span>, <span class="fn">Greater</span>, <span class="fn">Equal</span>,
+    <span class="comment">// Control Flow</span>
+    <span class="fn">Jump</span>, <span class="fn">JumpIf</span>, <span class="fn">Call</span>, <span class="fn">Return</span>,
+    <span class="comment">// Sprite &amp; Movie</span>
+    <span class="fn">CreateSprite</span>, <span class="fn">CloneSprite</span>,
+    <span class="fn">SetVisible</span>, <span class="fn">GotoFrame</span>,
+    <span class="comment">// I/O</span>
+    <span class="fn">PlaySound</span>, <span class="fn">PlayMusic</span>,
+    <span class="fn">StopSound</span>, <span class="fn">StopMusic</span>,
+    <span class="comment">// ... 36 opcodes total</span>
+}</code></pre>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-dot red"></span>
+            <span class="code-dot yellow"></span>
+            <span class="code-dot green"></span>
+            <span class="code-filename">mpeg/video.rs</span>
+          </div>
+          <pre><code><span class="comment">// Pure-Rust MPEG-1 video decoder</span>
+<span class="comment">// Ported from PL_MPEG — zero C dependencies</span>
+
+<span class="kw">pub struct</span> <span class="type">Mpeg1Decoder</span> {
+    buffer: <span class="type">BitBuffer</span>,
+    block: [<span class="type">i16</span>; <span class="num">64</span>],
+    dc_predictor: [<span class="type">i16</span>; <span class="num">3</span>],
+    quantizer_matrix: [[<span class="type">u8</span>; <span class="num">64</span>]; <span class="num">2</span>],
+}
+
+<span class="kw">impl</span> <span class="type">Mpeg1Decoder</span> {
+    <span class="kw">pub fn</span> <span class="fn">decode_frame</span>(
+        &amp;<span class="kw">mut</span> <span class="kw">self</span>,
+        frame: &amp;<span class="kw">mut</span> [<span class="type">u8</span>],
+    ) -> <span class="type">Result</span>&lt;()&gt; {
+        <span class="comment">// Full MPEG-1 I/B/P frame decode</span>
+        <span class="comment">// IDCT, motion compensation, YUV→RGB</span>
+    }
+}</code></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== QUICK START ====== -->
+  <section id="quickstart" class="section">
+    <div class="container">
+      <h2 class="section-title fade-in-up" data-i18n="qs-title">快速开始</h2>
+      <p class="section-subtitle fade-in-up" data-i18n="qs-subtitle">几行命令，即刻体验</p>
+      <div class="quickstart-grid">
+        <div class="quickstart-card fade-in-up">
+          <div class="qs-header">
+            <span class="qs-icon">🖥️</span>
+            <h3 data-i18n="qs-standalone">Standalone</h3>
+          </div>
+          <div class="qs-steps">
+            <div class="qs-step">
+              <span class="qs-num">1</span>
+              <div>
+                <p data-i18n="qs-standalone-1">下载最新版本</p>
+                <code data-i18n="qs-standalone-1-sub">从 Releases 页面下载对应平台的二进制文件</code>
+              </div>
+            </div>
+            <div class="qs-step">
+              <span class="qs-num">2</span>
+              <div>
+                <p data-i18n="qs-standalone-2">运行游戏</p>
+                <code>native32-emu game.smf</code>
+              </div>
+            </div>
+            <div class="qs-step">
+              <span class="qs-num">3</span>
+              <div>
+                <p data-i18n="qs-standalone-3">或从 ZIP 加载</p>
+                <code>native32-emu games.zip</code>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="quickstart-card fade-in-up">
+          <div class="qs-header">
+            <span class="qs-icon">🎮</span>
+            <h3>RetroArch</h3>
+          </div>
+          <div class="qs-steps">
+            <div class="qs-step">
+              <span class="qs-num">1</span>
+              <div>
+                <p data-i18n="qs-retro-1">下载 libretro 核心</p>
+                <code data-i18n="qs-retro-1-sub">从 Releases 页面下载对应平台的核心文件</code>
+              </div>
+            </div>
+            <div class="qs-step">
+              <span class="qs-num">2</span>
+              <div>
+                <p data-i18n="qs-retro-2">安装核心</p>
+                <code data-i18n="qs-retro-2-sub">复制到 RetroArch 的 cores/ 目录</code>
+              </div>
+            </div>
+            <div class="qs-step">
+              <span class="qs-num">3</span>
+              <div>
+                <p data-i18n="qs-retro-3">加载核心并启动</p>
+                <code>Load Core → Native32 → Load Content</code>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="quickstart-card fade-in-up">
+          <div class="qs-header">
+            <span class="qs-icon">🔨</span>
+            <h3 data-i18n="qs-build">从源码编译</h3>
+          </div>
+          <div class="qs-steps">
+            <div class="qs-step">
+              <span class="qs-num">1</span>
+              <div>
+                <p data-i18n="qs-build-1">克隆仓库</p>
+                <code>git clone https://github.com/jiangxincode/Native32Emu.git</code>
+              </div>
+            </div>
+            <div class="qs-step">
+              <span class="qs-num">2</span>
+              <div>
+                <p data-i18n="qs-build-2">编译 Standalone</p>
+                <code>cargo build -p native32emu --release</code>
+              </div>
+            </div>
+            <div class="qs-step">
+              <span class="qs-num">3</span>
+              <div>
+                <p data-i18n="qs-build-3">或编译 RetroArch 核心</p>
+                <code>cargo build -p native32emu-libretro --release</code>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ====== FOOTER ====== -->
+  <footer id="footer">
+    <div class="container">
+      <div class="footer-grid">
+        <div class="footer-brand">
+          <img src="res/logo.png" alt="Native32Emu" width="40" height="40">
+          <span class="footer-name">Native32Emu</span>
+          <p data-i18n="footer-desc">用 Rust 编写的 Native32 游戏模拟器</p>
+        </div>
+        <div class="footer-links">
+          <h4 data-i18n="footer-project">项目</h4>
+          <a href="https://github.com/jiangxincode/Native32Emu" target="_blank">GitHub</a>
+          <a href="https://github.com/jiangxincode/Native32Emu/releases" target="_blank">Releases</a>
+          <a href="https://github.com/jiangxincode/Native32Emu/blob/master/docs/CONTRIBUTING.md" target="_blank" data-i18n="footer-contributing">贡献指南</a>
+        </div>
+        <div class="footer-links">
+          <h4 data-i18n="footer-community">社区</h4>
+          <a href="https://discord.gg/7XDdSrYD" target="_blank">Discord</a>
+          <a href="https://qm.qq.com/q/LAO7DKAWUC" target="_blank">QQ Group</a>
+        </div>
+        <div class="footer-links">
+          <h4 data-i18n="footer-docs">文档</h4>
+          <a href="https://github.com/jiangxincode/Native32Emu/blob/master/docs/CLI-Options.md" target="_blank" data-i18n="footer-cli">CLI 选项</a>
+          <a href="https://github.com/jiangxincode/Native32Emu/blob/master/docs/Core-Options.md" target="_blank" data-i18n="footer-core">核心选项</a>
+          <a href="https://github.com/jiangxincode/Native32Emu/blob/master/docs/Game-Compatibility.md" target="_blank" data-i18n="footer-gamelist">游戏列表</a>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p data-i18n="footer-copy">BSD 3-Clause License &copy; 2025 Aloys. Built with 🦀 Rust.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

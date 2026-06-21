@@ -5,6 +5,7 @@
 </p>
 
 <p align="center">
+  <a href="https://jiangxincode.github.io/Native32Emu/"><img src="https://img.shields.io/badge/Website-Native32Emu-E8553A?logo=githubpages&logoColor=white" alt="Website"></a>
   <a href="https://github.com/jiangxincode/Native32Emu/actions/workflows/ci.yml"><img src="https://github.com/jiangxincode/Native32Emu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://github.com/jiangxincode/Native32Emu/releases/latest"><img src="https://img.shields.io/github/v/release/jiangxincode/Native32Emu" alt="Release"></a>
   <a href="https://github.com/jiangxincode/Native32Emu/releases"><img src="https://img.shields.io/github/downloads/jiangxincode/Native32Emu/total" alt="Downloads"></a>
