@@ -4,7 +4,6 @@ on:
   push:
     tags:
       - "v*"
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -201,6 +200,7 @@ jobs:
         with:
           draft: true
           prerelease: false
+          generate_release_notes: true
           name: "Native32 Emulator ${{ github.ref_name }}"
           body: |
             Native32 Emulator ${{ github.ref_name }}

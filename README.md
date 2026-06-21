@@ -37,7 +37,7 @@ Native32 is a game format developed by Sunplus for DVD player and TV chipsets (c
 
 Download the latest binary from the [Releases](https://github.com/jiangxincode/Native32Emu/releases) page.
 
-The basic usage is list below, but there are many more options for controlling the behavior of the emulator. See the [Command-line Options](docs/CLI-Options.md) documentation for the full list of options.
+The basic usage is listed below, but there are many more options for controlling the behavior of the emulator. See the [Command-line Options](docs/CLI-Options.md) documentation for the full list of options.
 
 ```bash
 # Basic usage
@@ -134,13 +134,6 @@ on Windows (`libnative32emu.so` on Linux, `libnative32emu.dylib` on macOS) under
 RetroArch's `cores/` directory.
 
 For Android cross-compilation, see [Android Libretro Core](docs/Android-Libretro-Core.md).
-
-#### Distributing via RetroArch's Online Updater
-
-Work to make the core installable directly from RetroArch (Online Updater > Core
-Downloader) — the buildbot recipe, the `libretro-super` info file, documentation,
-and their current status — is tracked in
-[issue #20](https://github.com/jiangxincode/Native32Emu/issues/20).
 
 ## Testing
 
