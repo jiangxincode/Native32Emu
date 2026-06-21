@@ -289,10 +289,6 @@ fn argb1555_to_argb(value: u16) -> u32 {
     }
 }
 
-fn read_u16_le(data: &[u8], offset: usize) -> u16 {
-    u16::from_le_bytes([data[offset], data[offset + 1]])
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

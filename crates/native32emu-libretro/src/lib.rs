@@ -5,7 +5,6 @@
 // (no post-build renaming required). All emulation logic lives in the shared
 // `native32emu` core crate; this crate only implements the libretro C API.
 
-#![allow(dead_code)]
 #![allow(clippy::upper_case_acronyms)]
 
 pub mod libretro;

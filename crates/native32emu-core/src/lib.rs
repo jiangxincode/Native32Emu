@@ -5,7 +5,6 @@
 // windowing or audio output device; the front-ends (the standalone binary and
 // the libretro core) link against this crate and add the platform layer.
 
-#![allow(dead_code)]
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::manual_memcpy)]
 #![allow(clippy::needless_range_loop)]
