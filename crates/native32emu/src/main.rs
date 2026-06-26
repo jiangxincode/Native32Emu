@@ -193,17 +193,15 @@ fn main() -> Result<()> {
 
         let frame_start = Instant::now();
 
-        // Feed keyboard state into the shared core, then run button actions
+        // Feed keyboard state into the shared core; tick consumes button actions
         let pressed = emu.input.get_pressed_keycodes(&window);
         emu.set_buttons(&pressed);
-        if emu.is_cutscene_active() {
-            // Allow skipping logo/cutscene videos with the A or B button, or
-            // automatically when auto-skip is enabled.
-            if emu.auto_skip_cutscenes || pressed.contains(&0x4000) || pressed.contains(&0x8800) {
-                emu.skip_cutscene();
-            }
-        } else {
-            emu.handle_buttons();
+        // Allow skipping logo/cutscene videos with the A or B button, or
+        // automatically when auto-skip is enabled.
+        if emu.is_cutscene_active()
+            && (emu.auto_skip_cutscenes || pressed.contains(&0x4000) || pressed.contains(&0x8800))
+        {
+            emu.skip_cutscene();
         }
 
         // Tick emulation (handles content switching internally)
@@ -233,8 +231,6 @@ fn main() -> Result<()> {
             )
             .context("Failed to update display")?;
 
-        // Update time
-        emu.time_ms += 1000 / 30;
         frame_count += 1;
 
         // Take screenshot if requested

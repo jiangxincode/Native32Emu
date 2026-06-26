@@ -191,6 +191,7 @@ impl Emulator {
         // of the normal timeline.
         if self.is_cutscene_active() {
             self.cutscene_tick();
+            self.time_ms += 1000 / 30;
             return;
         }
 
@@ -314,6 +315,8 @@ impl Emulator {
             }
         }
 
+        self.handle_buttons();
+
         // Handle content switching (SSL_PlayNext)
         if self.content_loader.has_pending() && !self.is_cutscene_active() {
             if let Some(filename) = self.content_loader.take_pending() {
@@ -322,6 +325,8 @@ impl Emulator {
                 }
             }
         }
+
+        self.time_ms += 1000 / 30;
     }
 
     /// Whether a cutscene video is currently playing or queued.

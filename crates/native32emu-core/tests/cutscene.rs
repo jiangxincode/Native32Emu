@@ -45,9 +45,6 @@ fn emetal_plays_logo_cutscene() {
     // ~6 seconds at 30fps.
     for _ in 0..180 {
         emu.set_buttons(&[]);
-        if !emu.is_cutscene_active() {
-            emu.handle_buttons();
-        }
         emu.tick();
         emu.draw();
         if emu.is_cutscene_active() {
