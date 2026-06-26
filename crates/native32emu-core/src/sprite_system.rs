@@ -63,14 +63,31 @@ impl SpriteSystem {
         for obj in frame_objects {
             if obj.obj_type == crate::file_loader::ObjectType::Movie {
                 if let Some(ref name) = obj.name {
-                    frame_movie_names.insert(name.clone());
-                    if !self.sprites.contains_key(name) {
-                        // Create new movie instance
-                        let mut state = MovieState::new(obj.index as u32, obj.x, obj.y, obj.depth);
-                        state.next_frame = Some(0);
-                        self.sprites.insert(name.clone(), state);
+                    if self.sprites.contains_key(name) {
+                        frame_movie_names.insert(name.clone());
+                    } else {
+                        let renamed_instance = self
+                            .sprites
+                            .iter()
+                            .find(|(_, movie)| {
+                                !movie.cloned
+                                    && movie.movie == obj.index as u32
+                                    && movie.depth == obj.depth
+                            })
+                            .map(|(existing_name, _)| existing_name.clone());
+
+                        if let Some(existing_name) = renamed_instance {
+                            frame_movie_names.insert(existing_name);
+                        } else {
+                            // Create new movie instance.
+                            let mut state =
+                                MovieState::new(obj.index as u32, obj.x, obj.y, obj.depth);
+                            state.next_frame = Some(0);
+                            self.sprites.insert(name.clone(), state);
+                            frame_movie_names.insert(name.clone());
+                        }
                     }
-                    // If already exists, preserve its state (don't reset)
+                    // If already exists, preserve its state (do not reset).
                 }
             }
         }
@@ -236,6 +253,23 @@ mod tests {
         let movie = ss.get("hero").unwrap();
         assert_eq!(movie.frame, 42, "frame should be preserved");
         assert!(!movie.visible, "visibility should be preserved");
+    }
+
+    #[test]
+    fn test_update_for_frame_preserves_renamed_instances_by_identity() {
+        let mut ss = SpriteSystem::new();
+        let objects = vec![make_movie_object("q0n0", 7, 10, 20, 3)];
+        ss.update_for_frame(&objects);
+
+        let mut renamed = ss.remove("q0n0").unwrap();
+        renamed.y = -124;
+        ss.insert("qn0".to_string(), renamed);
+
+        ss.update_for_frame(&objects);
+
+        assert!(ss.contains_key("qn0"));
+        assert!(!ss.contains_key("q0n0"));
+        assert_eq!(ss.get("qn0").unwrap().y, -124);
     }
 
     #[test]

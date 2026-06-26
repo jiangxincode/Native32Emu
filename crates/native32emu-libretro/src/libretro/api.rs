@@ -228,18 +228,15 @@ pub extern "C" fn retro_run() {
         let buttons = query_joypad_buttons(0);
         emu.set_buttons(&buttons);
 
-        // 3. Handle button events. During a cutscene, suppress game input and
+        // 3. During a cutscene, suppress game input and
         // allow the A or B button to skip the logo/cutscene videos instead.
         // When auto-skip is enabled, skip as soon as the cutscene starts.
-        if emu.is_cutscene_active() {
-            if emu.auto_skip_cutscenes
+        if emu.is_cutscene_active()
+            && (emu.auto_skip_cutscenes
                 || buttons.contains(&NATIVE32_KEY_A)
-                || buttons.contains(&NATIVE32_KEY_B)
-            {
-                emu.skip_cutscene();
-            }
-        } else {
-            emu.handle_buttons();
+                || buttons.contains(&NATIVE32_KEY_B))
+        {
+            emu.skip_cutscene();
         }
 
         // 4. Execute one tick of emulation
@@ -262,9 +259,6 @@ pub extern "C" fn retro_run() {
                 audio_samples.len() / 2, // Stereo: 2 samples per frame
             );
         }
-
-        // 8. Update time
-        emu.time_ms += 1000 / 30;
     }
 }
 

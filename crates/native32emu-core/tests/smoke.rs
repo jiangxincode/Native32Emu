@@ -134,7 +134,6 @@ fn run_one(path: &Path) -> Result<bool, String> {
 
     for _ in 0..FRAMES {
         emu.set_buttons(&[]);
-        emu.handle_buttons();
         emu.tick();
         emu.draw();
     }
@@ -183,7 +182,6 @@ where
     for frame in 0..frames {
         let pressed = input_for_frame(frame);
         emu.set_buttons(&pressed);
-        emu.handle_buttons();
         emu.tick();
         emu.draw();
     }
@@ -357,6 +355,66 @@ fn fhui_menu_starts_selected_game() {
     );
 }
 
+/// Regression test for Magical Adventure's first mini-game flow: a confirm
+/// press must be consumed by the mini-game script after the frame actions run,
+/// starting the timer instead of leaving the prompt stuck forever.
+#[test]
+#[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
+fn magical_adventure_minigame_confirm_starts_timer() {
+    let dir = match game_dir() {
+        Some(d) => d,
+        None => {
+            eprintln!("skipping: no game directory found (set NATIVE32_GAME_DIR)");
+            return;
+        }
+    };
+    let game = match find_asset(&dir, "MagicalA.smf") {
+        Some(p) => p,
+        None => {
+            eprintln!("skipping: MagicalA.smf not found under {}", dir.display());
+            return;
+        }
+    };
+
+    let mut emu = Emulator::from_path(game, 100).expect("load Magical Adventure");
+
+    for frame in 0..540 {
+        if frame == 240 {
+            emu.vm.vars.insert("gamestate".into(), "2".into());
+            emu.vm.vars.insert("mgstate".into(), "0".into());
+            emu.vm.vars.insert("mgkind".into(), "0".into());
+            emu.vm.vars.insert("mglevel".into(), "0".into());
+            emu.vm.vars.insert("mgenemy".into(), "0".into());
+            emu.vm.vars.insert("loopstep".into(), "0".into());
+            emu.vm.vars.insert("mgstep".into(), "0".into());
+            emu.vm.vars.insert("oldkeypad".into(), "0".into());
+            emu.vm.vars.insert("icount".into(), "0".into());
+        }
+
+        let pressed = if (80..83).contains(&frame)
+            || (220..223).contains(&frame)
+            || (285..288).contains(&frame)
+        {
+            vec![KEY_Z]
+        } else {
+            vec![]
+        };
+        emu.set_buttons(&pressed);
+        emu.tick();
+        emu.draw();
+    }
+
+    let timebar_frame = emu.sprites.get("timeBar").map(|m| m.frame).unwrap_or(0);
+    assert!(
+        timebar_frame > 0,
+        "mini-game timer did not advance after confirm (timeBar frame = {timebar_frame})"
+    );
+    assert!(
+        emu.vm.vars.get("mgstate").is_some_and(|v| v != "0"),
+        "mini-game stayed in init state after confirm: {:?}",
+        emu.vm.vars.get("mgstate")
+    );
+}
 /// Test ZIP file loading: a ZIP archive containing FHUI.smf should be extracted
 /// and the main menu loaded automatically.
 #[test]
@@ -403,7 +461,6 @@ fn zip_file_loads_fhui() {
     // Run a few frames to ensure it's functional
     for _ in 0..30 {
         emu.set_buttons(&[]);
-        emu.handle_buttons();
         emu.tick();
         emu.draw();
     }
