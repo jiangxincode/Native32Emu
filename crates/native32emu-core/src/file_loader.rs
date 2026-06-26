@@ -491,7 +491,7 @@ impl Native32Reader {
                 // Big-endian to little-endian conversion
                 SoundData {
                     format: AudioFormat::Raw,
-                    data: endian_swap_resample(raw_data),
+                    data: endian_swap_pcm16(raw_data),
                 }
             } else {
                 SoundData {
@@ -576,11 +576,12 @@ fn parse_resolution(gen_str: &str) -> Option<(u32, u32)> {
     None
 }
 
-fn endian_swap_resample(data: &[u8]) -> Vec<u8> {
+fn endian_swap_pcm16(data: &[u8]) -> Vec<u8> {
     let len = data.len() & 0xFFFFFFFE;
-    let mut result = vec![0u8; len * 2];
-    for i in 0..(2 * len) {
-        result[i] = data[(2 * (i / 4)) | ((i & 0x1) ^ 0x1)];
+    let mut result = vec![0u8; len];
+    for (out, input) in result.chunks_exact_mut(2).zip(data[..len].chunks_exact(2)) {
+        out[0] = input[1];
+        out[1] = input[0];
     }
     result
 }
@@ -623,45 +624,40 @@ mod tests {
         assert_eq!(parse_resolution("Resolution_0_0"), Some((0, 0)));
     }
 
-    // === endian_swap_resample tests ===
+    // === endian_swap_pcm16 tests ===
 
     #[test]
-    fn test_endian_swap_resample_two_bytes() {
-        // 2 bytes [0x12, 0x34] → 4 bytes with endian swap
+    fn test_endian_swap_pcm16_two_bytes() {
+        // 2 bytes [0x12, 0x34] stay 2 bytes with endian swap
         let input = vec![0x12, 0x34];
-        let output = endian_swap_resample(&input);
-        assert_eq!(output.len(), 4);
-        // The algorithm doubles the data and swaps bytes within each 16-bit sample
-        // Original: [0x12, 0x34] → pairs: (0x12, 0x34)
-        // Output: swap within pair → [0x34, 0x12, 0x34, 0x12]
-        assert_eq!(output, vec![0x34, 0x12, 0x34, 0x12]);
+        let output = endian_swap_pcm16(&input);
+        assert_eq!(output.len(), 2);
+        assert_eq!(output, vec![0x34, 0x12]);
     }
 
     #[test]
-    fn test_endian_swap_resample_four_bytes() {
+    fn test_endian_swap_pcm16_four_bytes() {
         let input = vec![0xAA, 0xBB, 0xCC, 0xDD];
-        let output = endian_swap_resample(&input);
-        assert_eq!(output.len(), 8);
+        let output = endian_swap_pcm16(&input);
+        assert_eq!(output.len(), 4);
         // Pairs: (0xAA, 0xBB), (0xCC, 0xDD)
-        // Each pair gets endian-swapped and doubled:
-        // [0xBB, 0xAA, 0xBB, 0xAA, 0xDD, 0xCC, 0xDD, 0xCC]
-        assert_eq!(output, vec![0xBB, 0xAA, 0xBB, 0xAA, 0xDD, 0xCC, 0xDD, 0xCC]);
+        assert_eq!(output, vec![0xBB, 0xAA, 0xDD, 0xCC]);
     }
 
     #[test]
-    fn test_endian_swap_resample_empty() {
-        let output = endian_swap_resample(&[]);
+    fn test_endian_swap_pcm16_empty() {
+        let output = endian_swap_pcm16(&[]);
         assert!(output.is_empty());
     }
 
     #[test]
-    fn test_endian_swap_resample_odd_length() {
+    fn test_endian_swap_pcm16_odd_length() {
         // Odd length: last byte is ignored (len & 0xFFFFFFFE)
         let input = vec![0x12, 0x34, 0x56];
-        let output = endian_swap_resample(&input);
-        // len = 2 (0x56 ignored), result = 2 * 2 = 4 bytes
-        assert_eq!(output.len(), 4);
-        assert_eq!(output, vec![0x34, 0x12, 0x34, 0x12]);
+        let output = endian_swap_pcm16(&input);
+        // len = 2 (0x56 ignored)
+        assert_eq!(output.len(), 2);
+        assert_eq!(output, vec![0x34, 0x12]);
     }
 
     // === ObjectType::from_u16 tests ===
