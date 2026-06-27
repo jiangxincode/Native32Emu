@@ -15,7 +15,7 @@
 - **Platform ports** — macOS and Linux testing and packaging
 - **Documentation** — improve docs and code comments
 - **Bug reports** — if you find a game that doesn't work correctly, please open an issue
-- **RetroArch integration** — MP3 audio support, save states, core options
+- **RetroArch integration** — save states
 
 ## Getting Started
 

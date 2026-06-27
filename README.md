@@ -81,7 +81,6 @@ for install and build instructions.
 - ✅ Audio output (RAW PCM, stereo)
 - ✅ Input handling (D-Pad + A/B buttons)
 - ✅ Game loading (.smf, .sgm, .ssl, .zip files)
-- ⚠️ MP3 audio (not yet implemented — only RAW PCM works)
 - ❌ Save states (not yet implemented)
 - ✅ Core options (audio volume, key auto-repeat timing, swap A/B, auto-skip cutscenes)
 
@@ -105,7 +104,6 @@ auto-repeat timing, swap A/B, auto-skip cutscenes). See
 #### Audio Notes
 
 - **RAW PCM**: Fully supported (11025Hz for YUV games, 22050Hz for ARGB games)
-- **MP3**: Not yet supported in libretro mode (games using MP3 will have no music)
 - Audio is output as stereo (mono sources are duplicated to both channels)
 
 ## Building
