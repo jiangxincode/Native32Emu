@@ -141,6 +141,45 @@ fn run_one(path: &Path) -> Result<bool, String> {
     Ok(frame_has_content(emu.get_framebuffer()))
 }
 
+#[test]
+#[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
+fn save_state_round_trip() {
+    let dir = game_dir().expect("no game directory found");
+    let game = find_asset(&dir, "FHUI.smf").expect("FHUI.smf not found");
+    let mut emu = Emulator::from_path(game, 100).expect("load game");
+
+    // Saving before the first tick exercises the frame-zero startup state.
+    let mut startup_state = vec![0; emu.serialize_size()];
+    emu.serialize(&mut startup_state)
+        .expect("save startup state");
+    emu.deserialize(&startup_state)
+        .expect("restore startup state");
+
+    for _ in 0..30 {
+        emu.set_buttons(&[]);
+        emu.tick();
+        emu.draw();
+    }
+    emu.vm.vars.insert("state_probe".into(), "saved".into());
+    let saved_tick = emu.tick_count;
+    let saved_frame = emu.frame_player.current_frame;
+    let saved_pixels = emu.get_framebuffer().to_vec();
+    let mut state = vec![0; emu.serialize_size()];
+    emu.serialize(&mut state).expect("save running state");
+
+    for _ in 0..5 {
+        emu.tick();
+    }
+    emu.vm.vars.insert("state_probe".into(), "changed".into());
+    emu.deserialize(&state).expect("restore running state");
+    emu.draw();
+
+    assert_eq!(emu.tick_count, saved_tick);
+    assert_eq!(emu.frame_player.current_frame, saved_frame);
+    assert_eq!(emu.vm.vars.get("state_probe").unwrap(), "saved");
+    assert_eq!(emu.get_framebuffer(), saved_pixels);
+}
+
 // ---------------------------------------------------------------------------
 // Scripted-input regression harness
 //

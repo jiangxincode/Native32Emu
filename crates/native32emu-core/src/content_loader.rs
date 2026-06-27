@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ContentLoader {
     pub pending_content: Option<String>,
 }

@@ -81,7 +81,7 @@ for install and build instructions.
 - ✅ Audio output (RAW PCM, stereo)
 - ✅ Input handling (D-Pad + A/B buttons)
 - ✅ Game loading (.smf, .sgm, .ssl, .zip files)
-- ❌ Save states (not yet implemented)
+- ✅ Save states
 - ✅ Core options (audio volume, key auto-repeat timing, swap A/B, auto-skip cutscenes)
 
 #### Core Options

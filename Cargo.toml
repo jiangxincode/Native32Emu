@@ -22,7 +22,9 @@ native32emu-core = { path = "crates/native32emu-core" }  # Platform-independent 
 anyhow = "1"              # Error handling (ergonomic Result types)
 thiserror = "2"           # Error handling (custom error enums)
 log = "0.4"               # Logging facade
-rand = "0.10"             # Random number generation (VM RandomNumber opcode)
+serde = { version = "1", features = ["derive"] }  # Save-state serialization
+serde_json = "1"          # Versioned save-state payloads
+crc32fast = "1"           # Save-state integrity checks
 image = "0.25"            # Image processing
 clap = { version = "4", features = ["derive"] }  # CLI argument parsing (standalone)
 minifb = "0.28"           # Window creation and pixel rendering (standalone)

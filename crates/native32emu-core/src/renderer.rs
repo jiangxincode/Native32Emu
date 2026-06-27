@@ -22,6 +22,7 @@ pub struct DrawEntry {
 }
 
 /// A runtime image override bound to a menu sprite.
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct SpriteOverride {
     image: RgbaImage,
     /// Optional "visibility leader" sprite. When set, the override is only
@@ -31,6 +32,13 @@ struct SpriteOverride {
     /// thumbnail hides together with its owning view instead of lingering when
     /// the view switches.
     visibility_leader: Option<String>,
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct RendererState {
+    pub screen_x: i32,
+    pub screen_y: i32,
+    sprite_overrides: HashMap<String, SpriteOverride>,
 }
 
 pub struct Renderer {
@@ -82,6 +90,20 @@ impl Renderer {
     /// Number of active sprite image overrides (for diagnostics/tests).
     pub fn sprite_override_count(&self) -> usize {
         self.sprite_overrides.len()
+    }
+
+    pub(crate) fn save_state(&self) -> RendererState {
+        RendererState {
+            screen_x: self.screen_x,
+            screen_y: self.screen_y,
+            sprite_overrides: self.sprite_overrides.clone(),
+        }
+    }
+
+    pub(crate) fn restore_state(&mut self, state: RendererState) {
+        self.screen_x = state.screen_x;
+        self.screen_y = state.screen_y;
+        self.sprite_overrides = state.sprite_overrides;
     }
 
     /// Resize the display buffer (e.g., when scaling changes).

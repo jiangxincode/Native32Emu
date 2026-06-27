@@ -3,8 +3,6 @@
 
 use std::collections::HashMap;
 
-use rand::RngExt;
-
 use crate::actions::Action;
 use crate::file_loader::{ActionPayload, Native32Reader};
 
@@ -78,7 +76,7 @@ pub trait VmHost {
 
 pub struct ActionVM {
     pub vars: HashMap<String, String>,
-    rng: rand::rngs::StdRng,
+    pub(crate) rng_state: u64,
 }
 
 impl Default for ActionVM {
@@ -89,11 +87,19 @@ impl Default for ActionVM {
 
 impl ActionVM {
     pub fn new() -> Self {
-        use rand::SeedableRng;
         Self {
             vars: HashMap::new(),
-            rng: rand::rngs::StdRng::seed_from_u64(0),
+            rng_state: 0x9e37_79b9_7f4a_7c15,
         }
+    }
+
+    fn random_below(&mut self, upper: u32) -> u32 {
+        // SplitMix64 gives us a compact, portable RNG state for save states.
+        self.rng_state = self.rng_state.wrapping_add(0x9e37_79b9_7f4a_7c15);
+        let mut value = self.rng_state;
+        value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+        value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+        ((value ^ (value >> 31)) % u64::from(upper)) as u32
     }
 
     /// Execute actions starting at the given 1-based instruction index.
@@ -409,7 +415,7 @@ impl ActionVM {
                     let upper = stack.pop().unwrap_or_default();
                     let upper_val = str_to_int(&upper) as u32;
                     let result = if upper_val > 0 {
-                        self.rng.random_range(0..upper_val)
+                        self.random_below(upper_val)
                     } else {
                         0
                     };
