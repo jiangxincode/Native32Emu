@@ -1,7 +1,7 @@
 // Image decoder for Native32 YUV and ARGB image formats.
 // Decodes compressed image data into ARGB pixel buffers.
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RgbaImage {
     pub width: u32,
     pub height: u32,

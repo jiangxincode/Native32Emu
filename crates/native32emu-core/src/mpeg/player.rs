@@ -43,6 +43,10 @@ impl VideoPlayer {
         self.finished
     }
 
+    pub fn elapsed(&self) -> f64 {
+        self.time
+    }
+
     /// Advance playback by `dt` seconds, decoding frames as needed, and render
     /// the current frame into `dst` (dst_w x dst_h XRGB8888).
     pub fn advance_and_render(&mut self, dt: f64, dst: &mut [u32], dst_w: usize, dst_h: usize) {

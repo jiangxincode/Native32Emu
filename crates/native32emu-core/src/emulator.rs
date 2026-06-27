@@ -10,7 +10,7 @@ use crate::renderer::Renderer;
 use crate::save_manager::SaveManager;
 use crate::sprite_system::{MovieState, SpriteSystem};
 use anyhow::{Context, Result};
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 
 /// The platform-independent emulator core.
 ///
@@ -21,6 +21,8 @@ use std::path::PathBuf;
 /// codes and produces a framebuffer plus audio samples.
 pub struct Emulator {
     pub filename: PathBuf,
+    /// Stable root used to encode content paths inside portable save states.
+    content_root: PathBuf,
     pub reader: Native32Reader,
     pub sprites: SpriteSystem,
     pub frame_player: FramePlayer,
@@ -42,6 +44,7 @@ pub struct Emulator {
     pub pending_videos: Vec<String>,
     /// Active cutscene player, if a video is currently playing.
     pub video_player: Option<crate::mpeg::VideoPlayer>,
+    active_video_name: Option<String>,
     /// The initial file loaded at startup (typically FHUI.smf from a ZIP).
     /// Set to None when the user loaded a game directly (not from a menu).
     /// Used to support "return to menu" on ESC.
@@ -88,8 +91,14 @@ impl Emulator {
             None
         };
 
+        let content_root = game_path
+            .parent()
+            .unwrap_or_else(|| Path::new(""))
+            .to_path_buf();
+
         Ok(Self {
             filename: game_path,
+            content_root,
             reader,
             sprites: SpriteSystem::new(),
             frame_player: FramePlayer::new(),
@@ -106,6 +115,7 @@ impl Emulator {
             time_ms: 0,
             pending_videos: Vec::new(),
             video_player: None,
+            active_video_name: None,
             initial_file,
             auto_skip_cutscenes: false,
             _temp_dir,
@@ -144,6 +154,7 @@ impl Emulator {
         self.renderer.clear_sprite_overrides();
         self.pending_videos.clear();
         self.video_player = None;
+        self.active_video_name = None;
         self.tick_count = 0;
         self.time_ms = 0;
         self.sprites = SpriteSystem::new();
@@ -348,6 +359,7 @@ impl Emulator {
     pub fn skip_cutscene(&mut self) {
         self.pending_videos.clear();
         self.video_player = None;
+        self.active_video_name = None;
         self.audio.stop_all();
     }
 
@@ -371,6 +383,7 @@ impl Emulator {
             player.advance_and_render(1.0 / 30.0, &mut self.renderer.buffer, w, h);
             if player.is_finished() {
                 self.video_player = None;
+                self.active_video_name = None;
                 self.audio.stop_all();
             }
         }
@@ -419,6 +432,7 @@ impl Emulator {
         match crate::mpeg::VideoPlayer::new(streams.video) {
             Some(player) => {
                 self.video_player = Some(player);
+                self.active_video_name = Some(name.to_string());
                 true
             }
             None => {
@@ -580,32 +594,138 @@ impl Emulator {
         self.sprites = SpriteSystem::new();
         self.frame_player = FramePlayer::new();
         self.vm = ActionVM::new();
+        self.pending_videos.clear();
+        self.video_player = None;
+        self.active_video_name = None;
         self.audio.stop_all();
     }
 
-    /// Get the size needed for serialization.
-    ///
-    /// Save states are not implemented yet. Returning 0 tells the libretro
-    /// frontend that this core does not support save states, so it will not
-    /// expose a (silently broken) save/load state action to the user.
+    /// Get the fixed size needed for libretro serialization.
     pub fn serialize_size(&self) -> usize {
-        0
+        crate::save_state::SERIALIZED_SIZE
     }
 
     /// Serialize the emulator state to a buffer.
-    ///
-    /// Not implemented yet: returns an error so the frontend does not believe a
-    /// save state was successfully captured.
-    pub fn serialize(&self, _buffer: &mut [u8]) -> Result<()> {
-        anyhow::bail!("save states are not supported")
+    pub fn serialize(&self, buffer: &mut [u8]) -> Result<()> {
+        use crate::save_state::{EmulatorState, VideoState};
+
+        let relative = self
+            .filename
+            .strip_prefix(&self.content_root)
+            .context("current content is outside the save-state content root")?;
+        if relative
+            .components()
+            .any(|component| !matches!(component, Component::Normal(_)))
+        {
+            anyhow::bail!("current content path cannot be represented safely");
+        }
+        let content_path = relative
+            .to_str()
+            .context("current content path is not valid UTF-8")?
+            .replace('\\', "/");
+
+        let state = EmulatorState {
+            content_path,
+            content_crc32: crc32fast::hash(&self.reader.data),
+            frame_player: self.frame_player.clone(),
+            sprites: self.sprites.clone(),
+            vm_vars: self.vm.vars.clone(),
+            rng_state: self.vm.rng_state,
+            audio: self.audio.save_state(),
+            renderer: self.renderer.save_state(),
+            content_loader: self.content_loader.clone(),
+            menu_context: self.menu_context.clone(),
+            tick_count: self.tick_count,
+            time_ms: self.time_ms,
+            pending_videos: self.pending_videos.clone(),
+            video: self
+                .active_video_name
+                .as_ref()
+                .zip(self.video_player.as_ref())
+                .map(|(name, player)| VideoState {
+                    name: name.clone(),
+                    elapsed: player.elapsed(),
+                }),
+        };
+        crate::save_state::encode(&state, buffer)
     }
 
     /// Deserialize the emulator state from a buffer.
-    ///
-    /// Not implemented yet: returns an error so the frontend does not believe a
-    /// save state was successfully restored.
-    pub fn deserialize(&mut self, _buffer: &[u8]) -> Result<()> {
-        anyhow::bail!("save states are not supported")
+    pub fn deserialize(&mut self, buffer: &[u8]) -> Result<()> {
+        let state = crate::save_state::decode(buffer)?;
+        let relative = Path::new(&state.content_path);
+        if relative.as_os_str().is_empty()
+            || relative
+                .components()
+                .any(|component| !matches!(component, Component::Normal(_)))
+        {
+            anyhow::bail!("save state contains an unsafe content path");
+        }
+
+        let content_path = self.content_root.join(relative);
+        let data = std::fs::read(&content_path).with_context(|| {
+            format!(
+                "failed to read save-state content: {}",
+                content_path.display()
+            )
+        })?;
+        if crc32fast::hash(&data) != state.content_crc32 {
+            anyhow::bail!("save state belongs to different content data");
+        }
+        let mut reader = Native32Reader::new(data);
+        reader
+            .init()
+            .context("failed to initialize save-state content")?;
+        if reader.resolution != (self.renderer.width, self.renderer.height) {
+            anyhow::bail!("save-state content resolution does not match the loaded game");
+        }
+        if state.video.as_ref().is_some_and(|video| {
+            !video.elapsed.is_finite() || video.elapsed < 0.0 || video.name.is_empty()
+        }) {
+            anyhow::bail!("save state contains invalid video playback state");
+        }
+
+        self.audio.stop_all();
+        self.filename = content_path;
+        self.reader = reader;
+        self.save_manager = SaveManager::new(&self.filename);
+        self.frame_player = state.frame_player;
+        self.sprites = state.sprites;
+        self.vm.vars = state.vm_vars;
+        self.vm.rng_state = state.rng_state;
+        self.content_loader = state.content_loader;
+        self.menu_context = state.menu_context;
+        self.tick_count = state.tick_count;
+        self.time_ms = state.time_ms;
+        self.pending_videos = state.pending_videos;
+        self.video_player = None;
+        self.active_video_name = None;
+        self.renderer.restore_state(state.renderer);
+        self.cur_frame_objects = if self.frame_player.current_frame == 0 {
+            Vec::new()
+        } else {
+            self.reader
+                .get_frame(self.frame_player.current_frame)
+                .unwrap_or_default()
+        };
+
+        if let Some(video) = state.video {
+            if !self.start_video(&video.name) {
+                anyhow::bail!("failed to restore active cutscene {}", video.name);
+            }
+            if let Some(player) = self.video_player.as_mut() {
+                player.advance_and_render(
+                    video.elapsed,
+                    &mut self.renderer.buffer,
+                    self.renderer.width as usize,
+                    self.renderer.height as usize,
+                );
+            }
+        }
+        self.audio.colorspace = self.reader.colorspace;
+        self.audio.restore_state(state.audio);
+        self.input.set_buttons(&[]);
+        Ok(())
     }
 }
 

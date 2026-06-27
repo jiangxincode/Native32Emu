@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MovieState {
     pub movie: u32,
     pub x: i16,
@@ -36,6 +36,7 @@ impl MovieState {
 
 pub type SpriteMap = HashMap<String, MovieState>;
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct SpriteSystem {
     pub sprites: SpriteMap,
 }

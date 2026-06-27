@@ -1,5 +1,6 @@
 // Frame player: manages the main timeline frame playback at 30fps.
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct FramePlayer {
     pub current_frame: u32,
     pub playing: bool,

@@ -28,6 +28,15 @@ pub struct AudioEngine {
     tone_active: bool,
 }
 
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub(crate) struct AudioState {
+    pub volume: f32,
+    pub music_owner: Option<String>,
+    pub pending_samples: Vec<i16>,
+    pub tone_phase: f64,
+    pub tone_active: bool,
+}
+
 impl AudioEngine {
     pub fn new(colorspace: Colorspace, volume: u32) -> Self {
         #[cfg(feature = "standalone")]
@@ -165,6 +174,25 @@ impl AudioEngine {
         // For MP3, we'll need a decoder. For now, return false to indicate not supported
         // A proper implementation would use a Rust MP3 decoder library
         false
+    }
+
+    pub(crate) fn save_state(&self) -> AudioState {
+        AudioState {
+            volume: self.volume,
+            music_owner: self.music_owner.clone(),
+            pending_samples: self.pending_samples.clone(),
+            tone_phase: self.tone_phase,
+            tone_active: self.tone_active,
+        }
+    }
+
+    pub(crate) fn restore_state(&mut self, state: AudioState) {
+        self.stop_all();
+        self.volume = state.volume.clamp(0.0, 1.0);
+        self.music_owner = state.music_owner;
+        self.pending_samples = state.pending_samples;
+        self.tone_phase = state.tone_phase;
+        self.tone_active = state.tone_active;
     }
 
     #[cfg(not(feature = "standalone"))]

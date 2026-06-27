@@ -27,4 +27,5 @@ pub mod input_handler;
 pub mod mpeg;
 pub mod renderer;
 pub mod save_manager;
+mod save_state;
 pub mod sprite_system;
