@@ -29,6 +29,7 @@ image = "0.25"            # Image processing
 clap = { version = "4", features = ["derive"] }  # CLI argument parsing (standalone)
 minifb = "0.28"           # Window creation and pixel rendering (standalone)
 rodio = { version = "0.22", features = ["mp3"] }  # Audio playback, MP3 + PCM (standalone)
+symphonia = { version = "0.5.5", default-features = false, features = ["mp3"] }  # Pure-Rust MP3 decoding
 env_logger = "0.11"       # Log output to stderr (standalone)
 
 [profile.release]

@@ -293,9 +293,12 @@ impl Emulator {
 
                 if let Some((sound, action)) = frame_data {
                     // Play sound if present and track it on the movie
-                    if sound != 0 && self.audio.play_sound(&mut self.reader, sound, name) {
-                        if let Some(movie) = self.sprites.get_mut(name) {
-                            movie.sound_channel = Some(0);
+                    if sound != 0 {
+                        if let Some(channel) = self.audio.play_sound(&mut self.reader, sound, name)
+                        {
+                            if let Some(movie) = self.sprites.get_mut(name) {
+                                movie.sound_channel = Some(channel);
+                            }
                         }
                     }
 
@@ -316,13 +319,13 @@ impl Emulator {
             }
         }
 
-        // Handle ended sounds
-        if !self.audio.is_playing() {
-            if let Some(owner) = self.audio.music_owner.clone() {
-                if let Some(movie) = self.sprites.get_mut(&owner) {
-                    movie.sound_channel = None;
-                }
-                self.audio.music_owner = None;
+        // Release movies whose sound channel reached the end.
+        for (_, movie) in self.sprites.iter_mut() {
+            if movie
+                .sound_channel
+                .is_some_and(|channel| !self.audio.is_channel_playing(channel))
+            {
+                movie.sound_channel = None;
             }
         }
 
