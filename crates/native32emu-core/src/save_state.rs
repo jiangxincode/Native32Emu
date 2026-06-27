@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 const MAGIC: &[u8; 8] = b"N32STATE";
-const VERSION: u32 = 1;
+const VERSION: u32 = 2;
 const HEADER_SIZE: usize = 20;
 
 /// libretro requires this value to remain constant for a loaded core.

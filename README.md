@@ -78,7 +78,7 @@ for install and build instructions.
 #### Supported Features
 
 - ✅ Video output (XRGB8888 pixel format)
-- ✅ Audio output (RAW PCM, stereo)
+- ✅ Audio output (looping MP3 music mixed with RAW PCM sound effects, stereo)
 - ✅ Input handling (D-Pad + A/B buttons)
 - ✅ Game loading (.smf, .sgm, .ssl, .zip files)
 - ✅ Save states
@@ -103,6 +103,7 @@ auto-repeat timing, swap A/B, auto-skip cutscenes). See
 
 #### Audio Notes
 
+- **MP3**: Fully supported, including finite/infinite loops and simultaneous sound effects
 - **RAW PCM**: Fully supported (11025Hz for YUV games, 22050Hz for ARGB games)
 - Audio is output as stereo (mono sources are duplicated to both channels)
 

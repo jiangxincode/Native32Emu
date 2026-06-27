@@ -209,7 +209,7 @@ impl Native32Reader {
         // 8 bytes: fps_color_size(2) + action_stack_var(2) + button_movieclip(2) + buffer_sound(2)
         // 16 bytes: load_addr(4) + binary_size(4) + mp3_offset(4) + mp3_length(4)
         // Total: 24 = 0x18 bytes
-        self.mp3_offset = read_u32_le(&self.data, self.base + 0x18);
+        self.mp3_offset = read_u32_le(&self.data, self.base + 0x10);
 
         // Decrypt the 32-byte encrypted header at base + 0x18
         let enc_start = self.base + 0x18;
@@ -455,37 +455,36 @@ impl Native32Reader {
             return Some(cached.clone());
         }
 
-        let table_idx = self.sound_table + (idx - 1) as usize * 4;
-        if table_idx + 4 > self.data.len() {
-            return None;
-        }
+        let table_offset = usize::try_from(idx.checked_sub(1)?).ok()?.checked_mul(4)?;
+        let table_idx = self.sound_table.checked_add(table_offset)?;
+        self.data.get(table_idx..table_idx.checked_add(4)?)?;
         let ptr = read_u32_le(&self.data, table_idx);
         let flags = ptr & 0xF0000000;
         let addr = (ptr & 0x0FFFFFFF) as usize;
 
         let result = if flags == 0xF0000000 {
             // MP3 audio
-            let begin = self.base + self.mp3_offset as usize + addr;
-            if begin + 6 > self.data.len() {
-                return None;
-            }
+            let begin = self
+                .base
+                .checked_add(self.mp3_offset as usize)?
+                .checked_add(addr)?;
+            self.data.get(begin..begin.checked_add(6)?)?;
             let size = read_u32_le(&self.data, begin) as usize;
-            let data_start = begin + 6;
-            let data_end = std::cmp::min(data_start + size, self.data.len());
+            let data_start = begin.checked_add(6)?;
+            let data_end = data_start.checked_add(size)?;
+            let data = self.data.get(data_start..data_end)?;
             SoundData {
                 format: AudioFormat::MP3,
-                data: self.data[data_start..data_end].to_vec(),
+                data: data.to_vec(),
             }
         } else if flags == 0x00000000 {
             // Raw PCM
-            let begin = self.base + addr;
-            if begin + 4 > self.data.len() {
-                return None;
-            }
+            let begin = self.base.checked_add(addr)?;
+            self.data.get(begin..begin.checked_add(4)?)?;
             let size = read_u32_le(&self.data, begin) as usize;
-            let data_start = begin + 4;
-            let data_end = std::cmp::min(data_start + size, self.data.len());
-            let raw_data = &self.data[data_start..data_end];
+            let data_start = begin.checked_add(4)?;
+            let data_end = data_start.checked_add(size)?;
+            let raw_data = self.data.get(data_start..data_end)?;
 
             if self.colorspace == Colorspace::YUV {
                 // Big-endian to little-endian conversion

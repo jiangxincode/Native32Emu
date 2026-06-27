@@ -454,6 +454,53 @@ fn magical_adventure_minigame_confirm_starts_timer() {
         emu.vm.vars.get("mgstate")
     );
 }
+#[test]
+#[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
+fn magical_adventure_mp3_music_decodes_mixes_and_loops() {
+    let dir = game_dir().expect("no game directory found");
+    let game = find_asset(&dir, "MagicalA.smf").expect("MagicalA.smf not found");
+    let mut emu = Emulator::from_path(game, 100).expect("load Magical Adventure");
+
+    let channel = emu
+        .audio
+        .play_sound(&mut emu.reader, 0xFF01, "regression_bgm")
+        .expect("decode looping MP3 background music");
+    let effect_channel = emu
+        .audio
+        .play_sound(&mut emu.reader, 0x0007, "regression_effect")
+        .expect("play RAW sound effect alongside MP3 music");
+    assert!(emu.audio.is_channel_playing(channel));
+    assert!(emu.audio.is_channel_playing(effect_channel));
+
+    let mut non_silent_frames = 0;
+    for _ in 0..900 {
+        let samples = emu.get_pending_audio_samples();
+        if samples.iter().any(|sample| *sample != 0) {
+            non_silent_frames += 1;
+        }
+    }
+
+    assert!(
+        non_silent_frames > 800,
+        "decoded MP3 unexpectedly contained prolonged silence"
+    );
+    assert!(
+        emu.audio.is_channel_playing(channel),
+        "0xFF MP3 background music stopped instead of looping"
+    );
+    assert!(
+        !emu.audio.is_channel_playing(effect_channel),
+        "one-shot RAW sound effect did not finish"
+    );
+
+    let mut state = vec![0; emu.serialize_size()];
+    emu.serialize(&mut state).expect("save active MP3 state");
+    emu.deserialize(&state).expect("restore active MP3 state");
+    assert!(
+        emu.audio.is_channel_playing(channel),
+        "active MP3 channel was not restored from save state"
+    );
+}
 /// Test ZIP file loading: a ZIP archive containing FHUI.smf should be extracted
 /// and the main menu loaded automatically.
 #[test]
