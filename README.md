@@ -222,6 +222,7 @@ Contributions are welcome! Whether you're interested in fixing bugs, adding feat
 
 - [n32emu](https://github.com/gatecat/n32emu) by Myrtle Shah — an earlier and simple Python implementation
 - [BootlegGames Wiki](https://bootleggames.fandom.com/wiki/Native_32) — hardware documentation and game catalog
+- [EVD Hardware Gameplay Recordings](https://www.youtube.com/watch?v=Y8LcdLGTNPQ&list=PLbIEtYwRsTQYFXR3dbWdDYSozlIQsRer3) — game recordings on actual EVD hardware
 
 ## License
 
