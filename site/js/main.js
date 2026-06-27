@@ -400,7 +400,7 @@
       html += '<button class="carousel-btn carousel-next" aria-label="Next">&#8250;</button>';
 
       // Dots
-      var cardsPerView = window.innerWidth > 768 ? 4 : 2;
+      var cardsPerView = window.innerWidth > 768 ? 4 : (window.innerWidth > 480 ? 2 : 1);
       var totalPages = Math.ceil(games.length / cardsPerView);
       html += '<div class="carousel-dots">';
       for (var d = 0; d < totalPages; d++) {
@@ -437,7 +437,7 @@
       var page = 0;
 
       function getCardsPerView() {
-        return window.innerWidth > 768 ? 4 : 2;
+        return window.innerWidth > 768 ? 4 : (window.innerWidth > 480 ? 2 : 1);
       }
 
       function getTotalPages() {
@@ -449,8 +449,12 @@
         var total = getTotalPages();
         page = Math.max(0, Math.min(p, total - 1));
         var cpv = getCardsPerView();
-        var cardWidth = viewport.offsetWidth / cpv;
-        track.style.transform = 'translateX(-' + (page * cpv * cardWidth) + 'px)';
+        var card = track.querySelector('.carousel-card');
+        var gap = parseFloat(window.getComputedStyle(track).columnGap) || 0;
+        var pageWidth = card ? cpv * (card.offsetWidth + gap) : viewport.offsetWidth;
+        var maxOffset = Math.max(0, track.scrollWidth - viewport.clientWidth);
+        var offset = Math.min(page * pageWidth, maxOffset);
+        track.style.transform = 'translateX(-' + offset + 'px)';
 
         dots.forEach(function (d, i) {
           d.classList.toggle('active', i === page);

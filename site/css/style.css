@@ -1102,13 +1102,12 @@ body::after {
 
 .carousel-track {
   display: flex;
+  gap: 16px;
   transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 .carousel-card {
-  min-width: 25%;
-  padding: 0 8px;
-  flex-shrink: 0;
+  flex: 0 0 calc((100% - 48px) / 4);
 }
 
 .carousel-card-inner,
@@ -1131,7 +1130,8 @@ body::after {
 .carousel-card img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  background: #000;
   transition: transform 0.5s;
 }
 
@@ -1240,14 +1240,14 @@ body::after {
    ============================================================ */
 @media (max-width: 768px) {
   .carousel-wrapper { padding: 0 36px; }
-  .carousel-card { min-width: 50%; }
+  .carousel-card { flex-basis: calc((100% - 16px) / 2); }
   .carousel-btn { width: 32px; height: 32px; font-size: 1.1rem; }
   .gallery-tab { padding: 6px 14px; font-size: 0.78rem; }
 }
 
 @media (max-width: 480px) {
   .carousel-wrapper { padding: 0 28px; }
-  .carousel-card { min-width: 50%; }
+  .carousel-card { flex-basis: 100%; }
   .carousel-card-overlay { opacity: 1; }
   .carousel-btn { width: 28px; height: 28px; font-size: 1rem; }
 }
