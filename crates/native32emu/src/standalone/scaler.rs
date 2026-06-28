@@ -13,6 +13,8 @@ pub enum ScaleFilter {
     Bilinear,
     /// Bicubic Catmull-Rom (separable 4-tap, sharper edges).
     Bicubic,
+    /// xBRZ pixel-art scaler (integer 2x-4x, then bilinear for remainder).
+    Xbrz,
 }
 
 // ── Bilateral axis map ───────────────────────────────────────────────────────
@@ -95,6 +97,7 @@ impl Scaler {
         match self.filter {
             ScaleFilter::Bilinear => self.scale_bilinear(src, src_w, src_h),
             ScaleFilter::Bicubic => self.scale_bicubic_sep(src, src_w, src_h),
+            ScaleFilter::Xbrz => self.scale_xbrz(src, src_w, src_h, dst_w, dst_h),
         }
 
         &self.output
@@ -242,6 +245,82 @@ impl Scaler {
                     | (clamp_i32_u8(r >> FRAC_BITS) << 16)
                     | (clamp_i32_u8(g >> FRAC_BITS) << 8)
                     | clamp_i32_u8(b >> FRAC_BITS);
+            }
+        }
+    }
+
+    // ── xBRZ (pixel-art) ─────────────────────────────────────────────────
+
+    /// xBRZ scaling: integer factor 2x-4x, then bilinear for any remainder.
+    fn scale_xbrz(&mut self, src: &[u32], src_w: u32, src_h: u32, dst_w: u32, dst_h: u32) {
+        let factor_x = dst_w / src_w;
+        let factor_y = dst_h / src_h;
+        let factor = factor_x.max(factor_y).clamp(2, 4);
+
+        // Step 1: xBRZ at integer factor.
+        let xbrz_buf = super::xbrz::scale_xbrz(src, src_w, src_h, factor);
+        let xbrz_w = src_w * factor;
+        let xbrz_h = src_h * factor;
+
+        if xbrz_w == dst_w && xbrz_h == dst_h {
+            // Perfect match — copy to output buffer.
+            self.output[..].copy_from_slice(&xbrz_buf);
+            return;
+        }
+
+        // Step 2: bilinear for remaining non-integer scaling.
+        // Rebuild bilinear maps for the intermediate → dst step.
+        let bi_x = build_bi_axis_map(xbrz_w, dst_w);
+        let bi_y = build_bi_axis_map(xbrz_h, dst_h);
+        let sw = xbrz_w as usize;
+        let sh = xbrz_h as usize;
+        let dw = dst_w as usize;
+
+        for (dy, ym) in bi_y.iter().enumerate() {
+            let sy0 = ym.src as usize;
+            let sy1 = (sy0 + 1).min(sh - 1);
+            let fy = ym.frac as u32;
+            let fy_inv = 256 - fy;
+
+            let row0 = &xbrz_buf[sy0 * sw..sy0 * sw + sw];
+            let row1 = &xbrz_buf[sy1 * sw..sy1 * sw + sw];
+            let dst_row = &mut self.output[dy * dw..dy * dw + dw];
+
+            for (dx, pixel) in dst_row.iter_mut().enumerate() {
+                let xm = &bi_x[dx];
+                let sx0 = xm.src as usize;
+                let sx1 = (sx0 + 1).min(sw - 1);
+                let fx = xm.frac as u32;
+                let fx_inv = 256 - fx;
+
+                let p00 = row0[sx0];
+                let p10 = row0[sx1];
+                let p01 = row1[sx0];
+                let p11 = row1[sx1];
+
+                let w00 = fx_inv * fy_inv;
+                let w10 = fx * fy_inv;
+                let w01 = fx_inv * fy;
+                let w11 = fx * fy;
+
+                let a = ((p00 >> 24) & 0xFF) * w00
+                    + ((p10 >> 24) & 0xFF) * w10
+                    + ((p01 >> 24) & 0xFF) * w01
+                    + ((p11 >> 24) & 0xFF) * w11;
+                let r = ((p00 >> 16) & 0xFF) * w00
+                    + ((p10 >> 16) & 0xFF) * w10
+                    + ((p01 >> 16) & 0xFF) * w01
+                    + ((p11 >> 16) & 0xFF) * w11;
+                let g = ((p00 >> 8) & 0xFF) * w00
+                    + ((p10 >> 8) & 0xFF) * w10
+                    + ((p01 >> 8) & 0xFF) * w01
+                    + ((p11 >> 8) & 0xFF) * w11;
+                let b = (p00 & 0xFF) * w00
+                    + (p10 & 0xFF) * w10
+                    + (p01 & 0xFF) * w01
+                    + (p11 & 0xFF) * w11;
+
+                *pixel = ((a >> 16) << 24) | ((r >> 16) << 16) | ((g >> 16) << 8) | (b >> 16);
             }
         }
     }

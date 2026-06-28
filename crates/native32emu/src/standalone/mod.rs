@@ -3,3 +3,4 @@
 pub mod cli;
 pub mod gamepad_overlay;
 pub mod scaler;
+pub mod xbrz;

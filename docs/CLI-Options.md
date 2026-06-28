@@ -33,7 +33,7 @@ native32-emu [OPTIONS] <GAME_PATH>
 | `--show-gamepad` | flag | off | Draw an on-screen virtual gamepad overlay showing pressed keys. |
 | `--repeat-delay <N>` | integer | `12` | Frames a held key waits before auto-repeat starts (see below). |
 | `--repeat-period <N>` | integer (≥1) | `3` | Frames between auto-repeat pulses once repeating (see below). |
-| `--filter <NAME>` | string | `nearest` | Pixel scaling filter: `nearest` (sharp pixels), `bilinear` (smooth edges), or `bicubic` (sharper Catmull-Rom). |
+| `--filter <NAME>` | string | `nearest` | Pixel scaling filter: `nearest`, `bilinear`, `bicubic`, or `xbrz` (pixel-art). |
 
 `--screenshot-frames` only has an effect together with `--screenshot`.
 
@@ -111,6 +111,7 @@ The `--filter` option controls how the native-resolution framebuffer (typically
 | `nearest` | Nearest-neighbor | Sharp pixel edges, classic retro look (default) |
 | `bilinear` | Bilinear interpolation | Smooth edges, reduces staircase artifacts |
 | `bicubic` | Catmull-Rom bicubic | Sharper than bilinear, better edge preservation |
+| `xbrz` | xBRZ pixel-art scaler | Smooth diagonals, sharp pixel edges, best for retro games |
 
 The filter has no effect at `--scale 1` (no upscaling needed). At higher scale
 factors the difference is most visible on diagonal lines and text:
@@ -124,6 +125,9 @@ native32-emu --scale 4 --filter bilinear game.smf
 
 # Sharper bicubic (Catmull-Rom)
 native32-emu --scale 4 --filter bicubic game.smf
+
+# xBRZ pixel-art scaler (smooth diagonals, sharp edges)
+native32-emu --scale 4 --filter xbrz game.smf
 ```
 
 ## Examples

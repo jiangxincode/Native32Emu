@@ -132,8 +132,10 @@ fn main() -> Result<()> {
 
     let use_custom_scaling = cli.filter != "nearest";
     let mut scaler = Scaler::new();
-    if cli.filter == "bicubic" {
-        scaler.set_filter(ScaleFilter::Bicubic);
+    match cli.filter.as_str() {
+        "bicubic" => scaler.set_filter(ScaleFilter::Bicubic),
+        "xbrz" => scaler.set_filter(ScaleFilter::Xbrz),
+        _ => {} // "nearest" and "bilinear" use default
     }
 
     // For fullscreen, get screen resolution before creating the window
