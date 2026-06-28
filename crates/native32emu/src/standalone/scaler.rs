@@ -66,7 +66,7 @@ impl Scaler {
             let row1 = &src[sy1 * sw..sy1 * sw + sw];
             let dst_row = &mut self.output[dy * dw..dy * dw + dw];
 
-            for dx in 0..dw {
+            for (dx, pixel) in dst_row.iter_mut().enumerate() {
                 let xm = &self.x_map[dx];
                 let sx0 = xm.src as usize;
                 let sx1 = (sx0 + 1).min(sw - 1);
@@ -103,7 +103,7 @@ impl Scaler {
                     + (p01 & 0xFF) * w01
                     + (p11 & 0xFF) * w11;
 
-                dst_row[dx] = ((a >> 16) << 24) | ((r >> 16) << 16) | ((g >> 16) << 8) | (b >> 16);
+                *pixel = ((a >> 16) << 24) | ((r >> 16) << 16) | ((g >> 16) << 8) | (b >> 16);
             }
         }
 
