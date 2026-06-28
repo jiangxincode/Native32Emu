@@ -184,9 +184,70 @@ jobs:
           name: native32-emu-android
           path: native32-emu-android-libretro.tar.gz
 
+  build-ios:
+    name: Build libretro (iOS)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,x86_64-apple-ios,aarch64-apple-ios-sim
+
+      - name: Cache Rust artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          key: ios
+
+      - name: Install cargo-lipo
+        run: cargo install cargo-lipo --locked
+
+      - name: Build libretro core (iOS universal: arm64 + x86_64)
+        run: |
+          cargo lipo \
+            --targets aarch64-apple-ios,x86_64-apple-ios \
+            -p native32emu-libretro --release
+
+      - name: Build libretro core (iOS Simulator - Apple Silicon)
+        run: |
+          cargo build \
+            -p native32emu-libretro --release \
+            --target aarch64-apple-ios-sim
+
+      - name: Stage libretro core (iOS)
+        shell: bash
+        run: |
+          out="libretro/native32-emu-ios"
+          mkdir -p "$out"
+          # Universal library for real devices (arm64 + x86_64)
+          cp "target/universal/release/libnative32emu.dylib" \
+             "$out/native32emu_libretro_ios.dylib"
+          # Apple Silicon simulator
+          mkdir -p "$out/simulator"
+          cp "target/aarch64-apple-ios-sim/release/libnative32emu.dylib" \
+             "$out/simulator/native32emu_libretro_ios.dylib"
+          # Info file
+          cp crates/native32emu-libretro/native32emu_libretro.info "$out/"
+          ls -laR "$out"
+
+      - name: Package libretro (iOS)
+        shell: bash
+        run: |
+          cd libretro
+          tar czf ../native32-emu-ios-libretro.tar.gz native32-emu-ios
+          cd ..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: native32-emu-ios
+          path: native32-emu-ios-libretro.tar.gz
+
   release:
     name: Create Release
-    needs: [build, build-android]
+    needs: [build, build-android, build-ios]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -221,6 +282,11 @@ jobs:
             - `native32-emu-android-libretro.tar.gz` contains
               `native32emu_libretro_android.so` for the `arm64-v8a`,
               `armeabi-v7a`, `x86` and `x86_64` ABIs.
+
+            ### iOS libretro core (for RetroArch on iOS)
+            - `native32-emu-ios-libretro.tar.gz` contains:
+              - `native32emu_libretro_ios.dylib` for real devices (arm64)
+              - `simulator/native32emu_libretro_ios.dylib` for iOS Simulator (Apple Silicon)
           files: artifacts/**/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
