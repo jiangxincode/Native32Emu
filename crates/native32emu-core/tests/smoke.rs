@@ -501,6 +501,29 @@ fn magical_adventure_mp3_music_decodes_mixes_and_loops() {
         "active MP3 channel was not restored from save state"
     );
 }
+
+#[test]
+#[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
+fn main_timeline_sound_objects_start_background_music() {
+    let dir = game_dir().expect("no game directory found");
+    for relative in ["ESPG/Basketba.smf", "EPUZ/Mouse.smf"] {
+        let game = dir.join(relative);
+        let mut emu = Emulator::from_path(game, 100).expect("load reported game");
+        emu.load_frame(1);
+
+        assert!(
+            emu.audio.is_playing(),
+            "{relative} did not start frame 1 music"
+        );
+        let samples: Vec<i16> = (0..30)
+            .flat_map(|_| emu.get_pending_audio_samples())
+            .collect();
+        assert!(
+            samples.iter().any(|sample| *sample != 0),
+            "{relative} frame 1 music decoded to silence"
+        );
+    }
+}
 /// Test ZIP file loading: a ZIP archive containing FHUI.smf should be extracted
 /// and the main menu loaded automatically.
 #[test]

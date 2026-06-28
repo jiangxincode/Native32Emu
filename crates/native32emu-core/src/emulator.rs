@@ -188,6 +188,13 @@ impl Emulator {
         if let Some(objects) = self.reader.get_frame(frame) {
             self.cur_frame_objects = objects.clone();
             self.sprites.update_for_frame(&objects);
+            for sound in objects
+                .iter()
+                .filter(|object| object.obj_type == ObjectType::Sound)
+                .map(|object| object.index)
+            {
+                self.audio.play_sound(&mut self.reader, sound, "");
+            }
         } else {
             log::warn!("Failed to load frame {}", frame);
             self.cur_frame_objects.clear();
