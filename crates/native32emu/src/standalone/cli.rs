@@ -63,6 +63,17 @@ pub struct Cli {
     /// Default: 3 (~0.1s). Must be at least 1.
     #[arg(long = "repeat-period", default_value = "3", value_parser = clap::value_parser!(u32).range(1..))]
     pub repeat_period: u32,
+
+    /// Pixel scaling filter for the display output.
+    ///
+    /// "nearest" preserves sharp pixel edges (classic retro look).
+    /// "bilinear" applies bilinear interpolation (smooth edges).
+    /// "bicubic" applies Catmull-Rom bicubic interpolation (sharper edges).
+    /// "xbrz" applies xBRZ pixel-art scaling (smooth diagonals, sharp pixels).
+    #[arg(long = "filter", default_value = "nearest",
+          value_parser = clap::builder::PossibleValuesParser::new(
+              ["nearest", "bilinear", "bicubic", "xbrz"]))]
+    pub filter: String,
 }
 
 impl Cli {
