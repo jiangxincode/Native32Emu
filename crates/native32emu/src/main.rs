@@ -14,6 +14,7 @@ use native32emu_core::emulator::Emulator;
 
 use crate::standalone::cli::Cli;
 use crate::standalone::gamepad_overlay::GamepadOverlay;
+use crate::standalone::scaler::Scaler;
 
 // Platform-specific screen resolution APIs for fullscreen mode
 
@@ -128,7 +129,9 @@ fn main() -> Result<()> {
     let resolution = emu.reader.resolution;
     let display_width = resolution.0 * cli.scale;
     let display_height = resolution.1 * cli.scale;
-    let (buf_width, buf_height) = (resolution.0, resolution.1);
+
+    let use_custom_scaling = cli.filter != "nearest";
+    let mut scaler = Scaler::new();
 
     // For fullscreen, get screen resolution before creating the window
     // so minifb creates the window at the correct size from the start.
@@ -138,11 +141,17 @@ fn main() -> Result<()> {
         (display_width as usize, display_height as usize)
     };
 
-    // Create window
+    // When using a custom filter we scale the buffer ourselves, so tell minifb
+    // to do a plain 1:1 stretch (our buffer already matches the window size).
+    // For nearest-neighbor we keep AspectRatioStretch so minifb does the work.
     let window_opts = minifb::WindowOptions {
         resize: !cli.fullscreen,
         borderless: cli.fullscreen,
-        scale_mode: minifb::ScaleMode::AspectRatioStretch,
+        scale_mode: if use_custom_scaling {
+            minifb::ScaleMode::Stretch
+        } else {
+            minifb::ScaleMode::AspectRatioStretch
+        },
         ..Default::default()
     };
 
@@ -223,13 +232,28 @@ fn main() -> Result<()> {
         }
 
         // Update window
-        window
-            .update_with_buffer(
+        if use_custom_scaling {
+            // Scale the native-resolution buffer to the display size using the
+            // bilinear scaler before handing it to minifb.
+            let scaled = scaler.scale(
                 &emu.renderer.buffer,
-                buf_width as usize,
-                buf_height as usize,
-            )
-            .context("Failed to update display")?;
+                resolution.0,
+                resolution.1,
+                window_width as u32,
+                window_height as u32,
+            );
+            window
+                .update_with_buffer(scaled, window_width, window_height)
+                .context("Failed to update display")?;
+        } else {
+            window
+                .update_with_buffer(
+                    &emu.renderer.buffer,
+                    resolution.0 as usize,
+                    resolution.1 as usize,
+                )
+                .context("Failed to update display")?;
+        }
 
         frame_count += 1;
 

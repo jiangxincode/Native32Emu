@@ -33,6 +33,7 @@ native32-emu [OPTIONS] <GAME_PATH>
 | `--show-gamepad` | flag | off | Draw an on-screen virtual gamepad overlay showing pressed keys. |
 | `--repeat-delay <N>` | integer | `12` | Frames a held key waits before auto-repeat starts (see below). |
 | `--repeat-period <N>` | integer (≥1) | `3` | Frames between auto-repeat pulses once repeating (see below). |
+| `--filter <NAME>` | string | `nearest` | Pixel scaling filter: `nearest` (sharp pixels) or `bilinear` (smooth edges). |
 
 `--screenshot-frames` only has an effect together with `--screenshot`.
 
@@ -100,6 +101,27 @@ Note: a very large `--repeat-delay` can make hold-to-run mechanics hard or
 impossible to trigger, because the game's detection window may close before the
 first repeat arrives.
 
+## Scaling Filter (`--filter`)
+
+The `--filter` option controls how the native-resolution framebuffer (typically
+320×240) is upscaled to the display window size.
+
+| Filter | Algorithm | Character |
+|---|---|---|
+| `nearest` | Nearest-neighbor | Sharp pixel edges, classic retro look (default) |
+| `bilinear` | Bilinear interpolation | Smooth edges, reduces staircase artifacts |
+
+The filter has no effect at `--scale 1` (no upscaling needed). At higher scale
+factors the difference is most visible on diagonal lines and text:
+
+```bash
+# Sharp pixels (default)
+native32-emu --scale 4 game.smf
+
+# Smooth bilinear interpolation
+native32-emu --scale 4 --filter bilinear game.smf
+```
+
 ## Examples
 
 ```bash
@@ -123,4 +145,7 @@ native32-emu --show-gamepad game.smf
 
 # Take a screenshot after 30 frames and exit
 native32-emu --screenshot screenshot.png --screenshot-frames 30 game.smf
+
+# Fullscreen with smooth bilinear scaling
+native32-emu --fullscreen --filter bilinear game.smf
 ```
