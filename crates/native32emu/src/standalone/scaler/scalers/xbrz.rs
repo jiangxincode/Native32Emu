@@ -1,20 +1,14 @@
 // xBRZ pixel-art scaler.
 //
-// A simplified implementation inspired by the xBRZ algorithm (by Zenju).
 // Detects edges and diagonals in a 3×3 neighbourhood and selectively blends
 // corner sub-pixels to smooth diagonal lines while preserving sharp
 // horizontal/vertical edges.
-//
-// Supports integer scale factors 2..=4. Output dimensions are
-// (src_w × factor, src_h × factor).
+// Supports integer scale factors 2..=4.
 
-/// Color distance threshold for "similar" pixels (0..765 range, i.e. sum of
-/// absolute R/G/B differences).  Tuned for 5-bit color (ARGB1555) where
-/// channel differences are quantised to multiples of 8.
+use super::build_bi_axis_map;
+
 const DIST_THRESHOLD: u32 = 80;
 
-/// Blend a sub-pixel toward `blend_to` by the given weight (0..255).
-/// `weight = 255` produces `blend_to` fully; `weight = 0` keeps `base`.
 #[inline]
 fn blend_pixel(base: u32, blend_to: u32, weight: u32) -> u32 {
     let inv = 255 - weight;
@@ -25,7 +19,6 @@ fn blend_pixel(base: u32, blend_to: u32, weight: u32) -> u32 {
     ((a / 255) << 24) | ((r / 255) << 16) | ((g / 255) << 8) | (b / 255)
 }
 
-/// Absolute colour distance (sum of |R| + |G| + |B|).
 #[inline]
 fn color_distance(c1: u32, c2: u32) -> u32 {
     let r1 = ((c1 >> 16) & 0xFF) as i32;
@@ -37,13 +30,6 @@ fn color_distance(c1: u32, c2: u32) -> u32 {
     (r1 - r2).unsigned_abs() + (g1 - g2).unsigned_abs() + (b1 - b2).unsigned_abs()
 }
 
-/// Detect diagonal blend for a corner of the output block.
-///
-/// For the top-left corner the diagonals are `d1 = NW`, `d2 = NE`,
-/// `d3 = SW`, `adj_h = N`, `adj_v = W`.
-///
-/// Returns `true` when the corner should be blended toward the opposite
-/// diagonal (`d3`).
 fn should_blend_corner(c: u32, d1: u32, d2: u32, d3: u32, adj_h: u32, adj_v: u32) -> bool {
     let similar_d1 = color_distance(c, d1) <= DIST_THRESHOLD;
     let similar_d2 = color_distance(c, d2) <= DIST_THRESHOLD;
@@ -51,35 +37,25 @@ fn should_blend_corner(c: u32, d1: u32, d2: u32, d3: u32, adj_h: u32, adj_v: u32
     let similar_h = color_distance(c, adj_h) <= DIST_THRESHOLD;
     let similar_v = color_distance(c, adj_v) <= DIST_THRESHOLD;
 
-    // The opposite diagonal (d3) differs from c → edge exists there.
     if !similar_d3 {
         return false;
     }
-
-    // d1 similar and adjacent differ → classic pixel-art diagonal.
     if similar_d1 && !similar_h && !similar_v {
         return true;
     }
-
-    // Gradient along the diagonal: d1≠d2 but both ≈c.
     if similar_d1 && similar_d2 && color_distance(d1, d2) > DIST_THRESHOLD {
         return true;
     }
-
     false
 }
 
-/// Scale a source image using the xBRZ algorithm.
-///
-/// `src` is a row-major `u32` ARGB buffer.  `factor` must be 2, 3, or 4.
-/// Returns a newly allocated `Vec<u32>` of size `(src_w × factor) × (src_h × factor)`.
-pub fn scale_xbrz(src: &[u32], src_w: u32, src_h: u32, factor: u32) -> Vec<u32> {
+/// xBRZ integer-factor scaling.  Writes into `dst` which must be
+/// `(src_w * factor) × (src_h * factor)` elements.
+pub fn scale(src: &[u32], src_w: u32, src_h: u32, factor: u32, dst: &mut [u32]) {
     let sw = src_w as usize;
     let sh = src_h as usize;
     let f = factor as usize;
     let dw = sw * f;
-    let dh = sh * f;
-    let mut out = vec![0u32; dw * dh];
 
     let get = |x: usize, y: usize| -> u32 {
         if x < sw && y < sh {
@@ -93,7 +69,6 @@ pub fn scale_xbrz(src: &[u32], src_w: u32, src_h: u32, factor: u32) -> Vec<u32> 
         for x in 0..sw {
             let c = get(x, y);
 
-            // 3×3 neighbourhood (0 = transparent for out-of-bounds).
             let nw = get(x.wrapping_sub(1), y.wrapping_sub(1));
             let n = get(x, y.wrapping_sub(1));
             let ne = get(x + 1, y.wrapping_sub(1));
@@ -103,58 +78,124 @@ pub fn scale_xbrz(src: &[u32], src_w: u32, src_h: u32, factor: u32) -> Vec<u32> 
             let s = get(x, y + 1);
             let se = get(x + 1, y + 1);
 
-            // ── Blend decisions for the 4 output sub-blocks ──────────────
-            //
-            // Top-left corner: diagonals NW/SE, adjacents N/W.
             let blend_tl = should_blend_corner(c, nw, ne, se, n, w);
-            // Top-right: diagonals NE/SW, adjacents N/E.
             let blend_tr = should_blend_corner(c, ne, nw, sw_p, n, e);
-            // Bottom-left: diagonals SW/NE, adjacents S/W.
             let blend_bl = should_blend_corner(c, sw_p, se, ne, s, w);
-            // Bottom-right: diagonals SE/NW, adjacents S/E.
             let blend_br = should_blend_corner(c, se, sw_p, nw, s, e);
 
-            // ── Write the factor×factor output block ─────────────────────
             let base_x = x * f;
             let base_y = y * f;
 
             if f == 2 {
-                out[base_y * dw + base_x] = if blend_tl { blend_pixel(c, se, 128) } else { c };
-                out[base_y * dw + base_x + 1] = if blend_tr {
+                dst[base_y * dw + base_x] = if blend_tl { blend_pixel(c, se, 128) } else { c };
+                dst[base_y * dw + base_x + 1] = if blend_tr {
                     blend_pixel(c, sw_p, 128)
                 } else {
                     c
                 };
-                out[(base_y + 1) * dw + base_x] =
+                dst[(base_y + 1) * dw + base_x] =
                     if blend_bl { blend_pixel(c, ne, 128) } else { c };
-                out[(base_y + 1) * dw + base_x + 1] =
+                dst[(base_y + 1) * dw + base_x + 1] =
                     if blend_br { blend_pixel(c, nw, 128) } else { c };
             } else {
-                // For 3x/4x: fill the entire block with c, then blend only
-                // the corner sub-pixels (positions 0 and f-1 on each edge).
                 for dy in 0..f {
                     for dx in 0..f {
-                        out[(base_y + dy) * dw + base_x + dx] = c;
+                        dst[(base_y + dy) * dw + base_x + dx] = c;
                     }
                 }
-                // Blend the 4 corner pixels.
                 if blend_tl {
-                    out[base_y * dw + base_x] = blend_pixel(c, se, 128);
+                    dst[base_y * dw + base_x] = blend_pixel(c, se, 128);
                 }
                 if blend_tr {
-                    out[base_y * dw + base_x + f - 1] = blend_pixel(c, sw_p, 128);
+                    dst[base_y * dw + base_x + f - 1] = blend_pixel(c, sw_p, 128);
                 }
                 if blend_bl {
-                    out[(base_y + f - 1) * dw + base_x] = blend_pixel(c, ne, 128);
+                    dst[(base_y + f - 1) * dw + base_x] = blend_pixel(c, ne, 128);
                 }
                 if blend_br {
-                    out[(base_y + f - 1) * dw + base_x + f - 1] = blend_pixel(c, nw, 128);
+                    dst[(base_y + f - 1) * dw + base_x + f - 1] = blend_pixel(c, nw, 128);
                 }
             }
         }
     }
+}
 
-    out
+/// Combined xBRZ + bilinear scaling for arbitrary output sizes.
+pub fn scale_with_bilinear(
+    src: &[u32],
+    src_w: u32,
+    src_h: u32,
+    dst_w: u32,
+    dst_h: u32,
+    dst: &mut [u32],
+) {
+    let factor_x = dst_w / src_w;
+    let factor_y = dst_h / src_h;
+    let factor = factor_x.max(factor_y).clamp(2, 4);
+
+    let xbrz_w = src_w * factor;
+    let xbrz_h = src_h * factor;
+
+    if xbrz_w == dst_w && xbrz_h == dst_h {
+        scale(src, src_w, src_h, factor, dst);
+        return;
+    }
+
+    // xBRZ at integer factor, then bilinear for the remainder.
+    let mut xbrz_buf = vec![0u32; (xbrz_w * xbrz_h) as usize];
+    scale(src, src_w, src_h, factor, &mut xbrz_buf);
+
+    let bi_x = build_bi_axis_map(xbrz_w, dst_w);
+    let bi_y = build_bi_axis_map(xbrz_h, dst_h);
+    let sw = xbrz_w as usize;
+    let sh = xbrz_h as usize;
+    let dw = dst_w as usize;
+
+    for (dy, ym) in bi_y.iter().enumerate() {
+        let sy0 = ym.src as usize;
+        let sy1 = (sy0 + 1).min(sh - 1);
+        let fy = ym.frac as u32;
+        let fy_inv = 256 - fy;
+
+        let row0 = &xbrz_buf[sy0 * sw..sy0 * sw + sw];
+        let row1 = &xbrz_buf[sy1 * sw..sy1 * sw + sw];
+        let dst_row = &mut dst[dy * dw..dy * dw + dw];
+
+        for (dx, pixel) in dst_row.iter_mut().enumerate() {
+            let xm = &bi_x[dx];
+            let sx0 = xm.src as usize;
+            let sx1 = (sx0 + 1).min(sw - 1);
+            let fx = xm.frac as u32;
+            let fx_inv = 256 - fx;
+
+            let p00 = row0[sx0];
+            let p10 = row0[sx1];
+            let p01 = row1[sx0];
+            let p11 = row1[sx1];
+
+            let w00 = fx_inv * fy_inv;
+            let w10 = fx * fy_inv;
+            let w01 = fx_inv * fy;
+            let w11 = fx * fy;
+
+            let a = ((p00 >> 24) & 0xFF) * w00
+                + ((p10 >> 24) & 0xFF) * w10
+                + ((p01 >> 24) & 0xFF) * w01
+                + ((p11 >> 24) & 0xFF) * w11;
+            let r = ((p00 >> 16) & 0xFF) * w00
+                + ((p10 >> 16) & 0xFF) * w10
+                + ((p01 >> 16) & 0xFF) * w01
+                + ((p11 >> 16) & 0xFF) * w11;
+            let g = ((p00 >> 8) & 0xFF) * w00
+                + ((p10 >> 8) & 0xFF) * w10
+                + ((p01 >> 8) & 0xFF) * w01
+                + ((p11 >> 8) & 0xFF) * w11;
+            let b =
+                (p00 & 0xFF) * w00 + (p10 & 0xFF) * w10 + (p01 & 0xFF) * w01 + (p11 & 0xFF) * w11;
+
+            *pixel = ((a >> 16) << 24) | ((r >> 16) << 16) | ((g >> 16) << 8) | (b >> 16);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -163,10 +204,9 @@ mod tests {
 
     #[test]
     fn xbrz_2x_uniform() {
-        let src = vec![0xFFFF0000_u32; 4]; // 2x2 all red
-        let out = scale_xbrz(&src, 2, 2, 2);
-        assert_eq!(out.len(), 16);
-        // All output pixels should be red (no edges to blend).
+        let src = vec![0xFFFF0000_u32; 4];
+        let mut out = vec![0u32; 16];
+        scale(&src, 2, 2, 2, &mut out);
         for &p in &out {
             assert_eq!(p, 0xFFFF0000);
         }
@@ -174,14 +214,11 @@ mod tests {
 
     #[test]
     fn xbrz_2x_diagonal() {
-        // 3x3 with a diagonal edge: top-left quadrant red, bottom-right blue.
         let r = 0xFFFF0000_u32;
         let b = 0xFF0000FF_u32;
         let src = vec![r, r, b, r, b, b, b, b, b];
-        let out = scale_xbrz(&src, 3, 3, 2);
-        assert_eq!(out.len(), 36);
-        // The centre pixel (1,1) should be blended at its corners.
-        // Just verify no panic and output is reasonable.
+        let mut out = vec![0u32; 36];
+        scale(&src, 3, 3, 2, &mut out);
         assert!(out.iter().all(|&p| (p >> 24) == 0xFF));
     }
 
@@ -193,6 +230,6 @@ mod tests {
     #[test]
     fn color_distance_different() {
         let d = color_distance(0xFFFF0000, 0xFF0000FF);
-        assert_eq!(d, 255 + 255); // R diff + B diff
+        assert_eq!(d, 255 + 255);
     }
 }
