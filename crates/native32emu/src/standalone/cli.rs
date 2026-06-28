@@ -68,9 +68,10 @@ pub struct Cli {
     ///
     /// "nearest" preserves sharp pixel edges (classic retro look).
     /// "bilinear" applies bilinear interpolation (smooth edges).
+    /// "bicubic" applies Catmull-Rom bicubic interpolation (sharper edges).
     #[arg(long = "filter", default_value = "nearest",
           value_parser = clap::builder::PossibleValuesParser::new(
-              ["nearest", "bilinear"]))]
+              ["nearest", "bilinear", "bicubic"]))]
     pub filter: String,
 }
 

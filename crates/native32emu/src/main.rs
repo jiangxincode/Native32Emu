@@ -14,7 +14,7 @@ use native32emu_core::emulator::Emulator;
 
 use crate::standalone::cli::Cli;
 use crate::standalone::gamepad_overlay::GamepadOverlay;
-use crate::standalone::scaler::Scaler;
+use crate::standalone::scaler::{ScaleFilter, Scaler};
 
 // Platform-specific screen resolution APIs for fullscreen mode
 
@@ -132,6 +132,9 @@ fn main() -> Result<()> {
 
     let use_custom_scaling = cli.filter != "nearest";
     let mut scaler = Scaler::new();
+    if cli.filter == "bicubic" {
+        scaler.set_filter(ScaleFilter::Bicubic);
+    }
 
     // For fullscreen, get screen resolution before creating the window
     // so minifb creates the window at the correct size from the start.
