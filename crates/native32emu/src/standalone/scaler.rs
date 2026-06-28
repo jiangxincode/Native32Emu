@@ -1,52 +1,54 @@
 // Software scaler: bilinear and bicubic interpolation on ARGB u32 buffers.
 //
-// Pre-computes per-pixel coordinate/weight mappings once when the output size
-// changes, then each frame is just a lookup + integer multiply loop with no
-// allocations and no floating-point in the hot path.
+// Bilinear uses a 2x2 neighbourhood with fixed-point weights.
+// Bicubic uses a *separable* two-pass Catmull-Rom filter (horizontal then
+// vertical) to halve the per-pixel work vs. a direct 4x4 kernel. All weights
+// and source indices are pre-computed; the inner loops are pure integer
+// arithmetic with no floating-point or per-pixel function calls.
 
 /// Scaling filter algorithm.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ScaleFilter {
-    /// Bilinear (2x2 neighborhood, fixed-point weights).
+    /// Bilinear (2x2 neighbourhood, fixed-point weights).
     Bilinear,
-    /// Bicubic Catmull-Rom (4x4 neighborhood, sharper edges).
+    /// Bicubic Catmull-Rom (separable 4-tap, sharper edges).
     Bicubic,
 }
 
-// ── Axis maps ────────────────────────────────────────────────────────────────
+// ── Bilateral axis map ───────────────────────────────────────────────────────
 
-/// Bilinear per-axis entry: source index + fractional weight (0..256).
 struct BiAxisMap {
     src: u32,
     frac: u16,
 }
 
-/// Bicubic per-axis entry: center source index + 4 pre-computed i32 weights
-/// (fixed-point with FRAC_BITS fractional bits).
-struct BicubicAxisMap {
-    /// Center source pixel (the t=0 reference); actual taps are c-1, c, c+1, c+2.
-    center: i32,
-    /// Catmull-Rom weights for taps [-1, 0, +1, +2], scaled to i32 fixed-point.
+// ── Bicubic axis map (pre-computed weights + clamped source indices) ─────────
+
+/// Pre-computed per-pixel data for one axis of the separable bicubic filter.
+struct BcAxisMap {
+    /// Clamped source indices for the 4 taps.
+    idx: [usize; 4],
+    /// Catmull-Rom weights in i32 fixed-point.
     w: [i32; 4],
 }
 
 /// Fixed-point fractional bits for bicubic weights.
-/// 16 bits gives ±32k range per channel × 4 taps = ±128k, fits i32 with margin.
 const FRAC_BITS: i32 = 10;
 const FRAC_UNIT: i32 = 1 << FRAC_BITS;
 
 // ── Scaler ───────────────────────────────────────────────────────────────────
 
-/// Scaler state that persists across frames to avoid re-allocations.
 pub struct Scaler {
     filter: ScaleFilter,
     // Bilinear maps.
     bi_x: Vec<BiAxisMap>,
     bi_y: Vec<BiAxisMap>,
-    // Bicubic maps.
-    bc_x: Vec<BicubicAxisMap>,
-    bc_y: Vec<BicubicAxisMap>,
-    // Current dimensions (used to detect when maps need rebuilding).
+    // Bicubic maps (pre-computed weights + clamped indices).
+    bc_x: Vec<BcAxisMap>,
+    bc_y: Vec<BcAxisMap>,
+    // Intermediate buffer for separable bicubic (dst_w × src_h).
+    intermediate: Vec<u32>,
+    // Current dimensions.
     src_w: u32,
     src_h: u32,
     dst_w: u32,
@@ -62,6 +64,7 @@ impl Scaler {
             bi_y: Vec::new(),
             bc_x: Vec::new(),
             bc_y: Vec::new(),
+            intermediate: Vec::new(),
             src_w: 0,
             src_h: 0,
             dst_w: 0,
@@ -70,20 +73,18 @@ impl Scaler {
         }
     }
 
-    /// Change the scaling filter.
     pub fn set_filter(&mut self, filter: ScaleFilter) {
         self.filter = filter;
     }
 
-    /// Scale `src` (ARGB u32, row-major) to the target dimensions.
-    /// Returns a reference to an internal buffer (reused across frames).
     pub fn scale(&mut self, src: &[u32], src_w: u32, src_h: u32, dst_w: u32, dst_h: u32) -> &[u32] {
         if src_w != self.src_w || src_h != self.src_h || dst_w != self.dst_w || dst_h != self.dst_h
         {
             self.bi_x = build_bi_axis_map(src_w, dst_w);
             self.bi_y = build_bi_axis_map(src_h, dst_h);
-            self.bc_x = build_bc_axis_map(src_w, dst_w);
-            self.bc_y = build_bc_axis_map(src_h, dst_h);
+            self.bc_x = build_bc_axis_map(src_w, dst_w, src_w);
+            self.bc_y = build_bc_axis_map(src_h, dst_h, src_h);
+            self.intermediate = vec![0u32; (dst_w * src_h) as usize];
             self.src_w = src_w;
             self.src_h = src_h;
             self.dst_w = dst_w;
@@ -93,15 +94,14 @@ impl Scaler {
 
         match self.filter {
             ScaleFilter::Bilinear => self.scale_bilinear(src, src_w, src_h),
-            ScaleFilter::Bicubic => self.scale_bicubic(src, src_w, src_h),
+            ScaleFilter::Bicubic => self.scale_bicubic_sep(src, src_w, src_h),
         }
 
         &self.output
     }
 
-    // ── Bilinear ─────────────────────────────────────────────────────────
+    // ── Bilinear (unchanged) ──────────────────────────────────────────────
 
-    /// Bilinear scaling: 2x2 neighborhood with fixed-point weights.
     fn scale_bilinear(&mut self, src: &[u32], src_w: u32, src_h: u32) {
         let sw = src_w as usize;
         let sh = src_h as usize;
@@ -157,92 +157,91 @@ impl Scaler {
         }
     }
 
-    // ── Bicubic ──────────────────────────────────────────────────────────
+    // ── Bicubic separable (horizontal → vertical) ─────────────────────────
 
-    /// Bicubic scaling: 4x4 Catmull-Rom with pre-computed fixed-point weights.
-    fn scale_bicubic(&mut self, src: &[u32], src_w: u32, src_h: u32) {
+    fn scale_bicubic_sep(&mut self, src: &[u32], src_w: u32, src_h: u32) {
         let sw = src_w as usize;
-        let sh = src_h as usize;
         let dw = self.dst_w as usize;
-        let sh_i = sh as i32;
-        let sw_i = sw as i32;
 
-        for dy in 0..self.dst_h as usize {
-            let ym = &self.bc_y[dy];
-            let cy = ym.center;
-            let wy = &ym.w;
-
-            // Pre-fetch the 4 source rows (clamped).
-            let sy = [
-                (cy - 1).clamp(0, sh_i - 1) as usize * sw,
-                cy.clamp(0, sh_i - 1) as usize * sw,
-                (cy + 1).clamp(0, sh_i - 1) as usize * sw,
-                (cy + 2).clamp(0, sh_i - 1) as usize * sw,
-            ];
-            let rows = [
-                &src[sy[0]..sy[0] + sw],
-                &src[sy[1]..sy[1] + sw],
-                &src[sy[2]..sy[2] + sw],
-                &src[sy[3]..sy[3] + sw],
-            ];
-
-            let dst_row = &mut self.output[dy * dw..dy * dw + dw];
+        // Pass 1: horizontal  (src_w × src_h → dst_w × src_h)
+        for sy in 0..src_h as usize {
+            let src_row = &src[sy * sw..sy * sw + sw];
+            let dst_row = &mut self.intermediate[sy * dw..sy * dw + dw];
 
             for (dx, pixel) in dst_row.iter_mut().enumerate() {
                 let xm = &self.bc_x[dx];
-                let cx = xm.center;
+                let idx = &xm.idx;
                 let wx = &xm.w;
 
-                // Source column indices (clamped).
-                let sx = [
-                    (cx - 1).clamp(0, sw_i - 1) as usize,
-                    cx.clamp(0, sw_i - 1) as usize,
-                    (cx + 1).clamp(0, sw_i - 1) as usize,
-                    (cx + 2).clamp(0, sw_i - 1) as usize,
-                ];
+                let p0 = src_row[idx[0]];
+                let p1 = src_row[idx[1]];
+                let p2 = src_row[idx[2]];
+                let p3 = src_row[idx[3]];
 
-                // 4×4 weighted sum using fixed-point i32.
-                let mut ra: i32 = 0;
-                let mut rr: i32 = 0;
-                let mut rg: i32 = 0;
-                let mut rb: i32 = 0;
+                let a = ((p0 >> 24) & 0xFF) as i32 * wx[0]
+                    + ((p1 >> 24) & 0xFF) as i32 * wx[1]
+                    + ((p2 >> 24) & 0xFF) as i32 * wx[2]
+                    + ((p3 >> 24) & 0xFF) as i32 * wx[3];
+                let r = ((p0 >> 16) & 0xFF) as i32 * wx[0]
+                    + ((p1 >> 16) & 0xFF) as i32 * wx[1]
+                    + ((p2 >> 16) & 0xFF) as i32 * wx[2]
+                    + ((p3 >> 16) & 0xFF) as i32 * wx[3];
+                let g = ((p0 >> 8) & 0xFF) as i32 * wx[0]
+                    + ((p1 >> 8) & 0xFF) as i32 * wx[1]
+                    + ((p2 >> 8) & 0xFF) as i32 * wx[2]
+                    + ((p3 >> 8) & 0xFF) as i32 * wx[3];
+                let b = (p0 & 0xFF) as i32 * wx[0]
+                    + (p1 & 0xFF) as i32 * wx[1]
+                    + (p2 & 0xFF) as i32 * wx[2]
+                    + (p3 & 0xFF) as i32 * wx[3];
 
-                for j in 0..4 {
-                    let wy_j = wy[j];
-                    let row = rows[j];
-                    let p0 = row[sx[0]];
-                    let p1 = row[sx[1]];
-                    let p2 = row[sx[2]];
-                    let p3 = row[sx[3]];
+                *pixel = (clamp_i32_u8(a >> FRAC_BITS) << 24)
+                    | (clamp_i32_u8(r >> FRAC_BITS) << 16)
+                    | (clamp_i32_u8(g >> FRAC_BITS) << 8)
+                    | clamp_i32_u8(b >> FRAC_BITS);
+            }
+        }
 
-                    let w0 = (wx[0] * wy_j) >> FRAC_BITS;
-                    let w1 = (wx[1] * wy_j) >> FRAC_BITS;
-                    let w2 = (wx[2] * wy_j) >> FRAC_BITS;
-                    let w3 = (wx[3] * wy_j) >> FRAC_BITS;
+        // Pass 2: vertical  (dst_w × src_h → dst_w × dst_h)
+        let mid = &self.intermediate;
+        for dy in 0..self.dst_h as usize {
+            let ym = &self.bc_y[dy];
+            let idx = &ym.idx;
+            let wy = &ym.w;
 
-                    ra += ((p0 >> 24) & 0xFF) as i32 * w0
-                        + ((p1 >> 24) & 0xFF) as i32 * w1
-                        + ((p2 >> 24) & 0xFF) as i32 * w2
-                        + ((p3 >> 24) & 0xFF) as i32 * w3;
-                    rr += ((p0 >> 16) & 0xFF) as i32 * w0
-                        + ((p1 >> 16) & 0xFF) as i32 * w1
-                        + ((p2 >> 16) & 0xFF) as i32 * w2
-                        + ((p3 >> 16) & 0xFF) as i32 * w3;
-                    rg += ((p0 >> 8) & 0xFF) as i32 * w0
-                        + ((p1 >> 8) & 0xFF) as i32 * w1
-                        + ((p2 >> 8) & 0xFF) as i32 * w2
-                        + ((p3 >> 8) & 0xFF) as i32 * w3;
-                    rb += (p0 & 0xFF) as i32 * w0
-                        + (p1 & 0xFF) as i32 * w1
-                        + (p2 & 0xFF) as i32 * w2
-                        + (p3 & 0xFF) as i32 * w3;
-                }
+            let row0 = &mid[idx[0] * dw..idx[0] * dw + dw];
+            let row1 = &mid[idx[1] * dw..idx[1] * dw + dw];
+            let row2 = &mid[idx[2] * dw..idx[2] * dw + dw];
+            let row3 = &mid[idx[3] * dw..idx[3] * dw + dw];
+            let dst_row = &mut self.output[dy * dw..dy * dw + dw];
 
-                // Shift back from fixed-point and clamp to [0, 255].
-                *pixel = (clamp_i32_u8(ra >> FRAC_BITS) << 24)
-                    | (clamp_i32_u8(rr >> FRAC_BITS) << 16)
-                    | (clamp_i32_u8(rg >> FRAC_BITS) << 8)
-                    | clamp_i32_u8(rb >> FRAC_BITS);
+            for (dx, pixel) in dst_row.iter_mut().enumerate() {
+                let p0 = row0[dx];
+                let p1 = row1[dx];
+                let p2 = row2[dx];
+                let p3 = row3[dx];
+
+                let a = ((p0 >> 24) & 0xFF) as i32 * wy[0]
+                    + ((p1 >> 24) & 0xFF) as i32 * wy[1]
+                    + ((p2 >> 24) & 0xFF) as i32 * wy[2]
+                    + ((p3 >> 24) & 0xFF) as i32 * wy[3];
+                let r = ((p0 >> 16) & 0xFF) as i32 * wy[0]
+                    + ((p1 >> 16) & 0xFF) as i32 * wy[1]
+                    + ((p2 >> 16) & 0xFF) as i32 * wy[2]
+                    + ((p3 >> 16) & 0xFF) as i32 * wy[3];
+                let g = ((p0 >> 8) & 0xFF) as i32 * wy[0]
+                    + ((p1 >> 8) & 0xFF) as i32 * wy[1]
+                    + ((p2 >> 8) & 0xFF) as i32 * wy[2]
+                    + ((p3 >> 8) & 0xFF) as i32 * wy[3];
+                let b = (p0 & 0xFF) as i32 * wy[0]
+                    + (p1 & 0xFF) as i32 * wy[1]
+                    + (p2 & 0xFF) as i32 * wy[2]
+                    + (p3 & 0xFF) as i32 * wy[3];
+
+                *pixel = (clamp_i32_u8(a >> FRAC_BITS) << 24)
+                    | (clamp_i32_u8(r >> FRAC_BITS) << 16)
+                    | (clamp_i32_u8(g >> FRAC_BITS) << 8)
+                    | clamp_i32_u8(b >> FRAC_BITS);
             }
         }
     }
@@ -264,25 +263,28 @@ fn build_bi_axis_map(src_size: u32, dst_size: u32) -> Vec<BiAxisMap> {
     map
 }
 
-fn build_bc_axis_map(src_size: u32, dst_size: u32) -> Vec<BicubicAxisMap> {
+fn build_bc_axis_map(src_size: u32, dst_size: u32, clamp_size: u32) -> Vec<BcAxisMap> {
+    let max_idx = clamp_size as usize - 1;
     let mut map = Vec::with_capacity(dst_size as usize);
     for d in 0..dst_size {
         let src_f = (d as f64 + 0.5) * src_size as f64 / dst_size as f64 - 0.5;
         let center = src_f.floor() as i32;
         let t = (src_f - center as f64) as f32;
-        map.push(BicubicAxisMap {
-            center,
-            w: catmull_rom_weights_fixed(t),
-        });
+        let w = catmull_rom_weights_fixed(t);
+        // Pre-compute clamped source indices for the 4 taps.
+        let idx = [
+            (center - 1).clamp(0, max_idx as i32) as usize,
+            center.clamp(0, max_idx as i32) as usize,
+            (center + 1).clamp(0, max_idx as i32) as usize,
+            (center + 2).clamp(0, max_idx as i32) as usize,
+        ];
+        map.push(BcAxisMap { idx, w });
     }
     map
 }
 
 // ── Catmull-Rom kernel ───────────────────────────────────────────────────────
 
-/// Catmull-Rom weights for fractional offset `t` in [0, 1), returned as
-/// i32 fixed-point with `FRAC_BITS` fractional bits.
-/// Weights correspond to source positions [-1, 0, +1, +2] relative to center.
 fn catmull_rom_weights_fixed(t: f32) -> [i32; 4] {
     let t2 = t * t;
     let t3 = t2 * t;
@@ -294,7 +296,6 @@ fn catmull_rom_weights_fixed(t: f32) -> [i32; 4] {
     ]
 }
 
-/// Clamp an i32 to [0, 255] and return as u32.
 #[inline]
 fn clamp_i32_u8(v: i32) -> u32 {
     v.clamp(0, 255) as u32
@@ -314,10 +315,7 @@ mod tests {
 
     #[test]
     fn scaler_2x_to_4x4() {
-        let src = vec![
-            0xFFFF0000, 0xFF00FF00, //
-            0xFF0000FF, 0xFFFFFF00, //
-        ];
+        let src = vec![0xFFFF0000, 0xFF00FF00, 0xFF0000FF, 0xFFFFFF00];
         let mut scaler = Scaler::new();
         let out = scaler.scale(&src, 2, 2, 4, 4);
         assert_eq!(out.len(), 16);
@@ -335,22 +333,17 @@ mod tests {
 
     #[test]
     fn bicubic_2x_to_4x4() {
-        let src = vec![
-            0xFFFF0000, 0xFF00FF00, //
-            0xFF0000FF, 0xFFFFFF00, //
-        ];
+        let src = vec![0xFFFF0000, 0xFF00FF00, 0xFF0000FF, 0xFFFFFF00];
         let mut scaler = Scaler::new();
         scaler.set_filter(ScaleFilter::Bicubic);
         let out = scaler.scale(&src, 2, 2, 4, 4);
         assert_eq!(out.len(), 16);
-        // Alpha may have small rounding error from fixed-point bicubic.
         assert!((out[0] >> 24) >= 0xFC, "alpha too low: {:08x}", out[0]);
     }
 
     #[test]
     fn catmull_rom_fixed_at_zero() {
         let w = catmull_rom_weights_fixed(0.0);
-        // At t=0: w(0)=1.0 → FRAC_UNIT, others ≈0
         assert!((w[1] - FRAC_UNIT).unsigned_abs() <= 1);
         assert!(w[0].unsigned_abs() <= 1);
         assert!(w[2].unsigned_abs() <= 1);
@@ -359,7 +352,6 @@ mod tests {
 
     #[test]
     fn catmull_rom_fixed_sum() {
-        // Sum of weights should be ≈ FRAC_UNIT for any t.
         for t_int in 0..100 {
             let t = t_int as f32 / 100.0;
             let w = catmull_rom_weights_fixed(t);
