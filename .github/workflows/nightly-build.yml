@@ -226,34 +226,35 @@ jobs:
         with:
           key: nightly-ios
 
-      - name: Install cargo-lipo
-        run: cargo install cargo-lipo --locked
-
-      - name: Build libretro core (iOS universal - arm64 + x86_64)
+      - name: Build libretro core (arm64 for real devices)
         run: |
-          cargo lipo \
-            --targets aarch64-apple-ios,x86_64-apple-ios \
-            -p native32emu-libretro --release
+          cargo build -p native32emu-libretro --release --target aarch64-apple-ios
 
-      - name: Build libretro core (iOS Simulator - Apple Silicon)
+      - name: Build libretro core (x86_64 for real devices)
         run: |
-          cargo build \
-            -p native32emu-libretro --release \
-            --target aarch64-apple-ios-sim
+          cargo build -p native32emu-libretro --release --target x86_64-apple-ios
 
-      - name: Stage libretro core (iOS)
+      - name: Build libretro core (arm64 for simulator)
+        run: |
+          cargo build -p native32emu-libretro --release --target aarch64-apple-ios-sim
+
+      - name: Create universal library and stage
         shell: bash
         run: |
           out="libretro/native32-emu-ios"
-          mkdir -p "$out"
-          # Universal library for real devices (arm64 + x86_64)
-          cp "target/universal/release/libnative32emu.dylib" \
-             "$out/native32emu_libretro_ios.dylib"
-          # Apple Silicon simulator
           mkdir -p "$out/simulator"
-          cp "target/aarch64-apple-ios-sim/release/libnative32emu.dylib" \
+
+          # Create universal library for real devices (arm64 + x86_64)
+          lipo -create \
+            target/aarch64-apple-ios/release/libnative32emu.dylib \
+            target/x86_64-apple-ios/release/libnative32emu.dylib \
+            -output "$out/native32emu_libretro_ios.dylib"
+
+          # Copy arm64 simulator library
+          cp target/aarch64-apple-ios-sim/release/libnative32emu.dylib \
              "$out/simulator/native32emu_libretro_ios.dylib"
-          # Info file
+
+          # Copy info file
           cp crates/native32emu-libretro/native32emu_libretro.info "$out/"
           ls -laR "$out"
 
