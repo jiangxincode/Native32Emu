@@ -12,6 +12,15 @@ use crate::sprite_system::{MovieState, SpriteSystem};
 use anyhow::{Context, Result};
 use std::path::{Component, Path, PathBuf};
 
+fn timeline_sound_value(index: u16, loop_count: i16) -> u16 {
+    let repeat = if loop_count == i16::MAX {
+        0xFF
+    } else {
+        loop_count.clamp(0, 0xFE) as u16
+    };
+    (repeat << 8) | (index & 0xFF)
+}
+
 /// The platform-independent emulator core.
 ///
 /// This holds all the game simulation state and is shared by both the
@@ -191,9 +200,9 @@ impl Emulator {
             for sound in objects
                 .iter()
                 .filter(|object| object.obj_type == ObjectType::Sound)
-                .map(|object| object.index)
             {
-                self.audio.play_sound(&mut self.reader, sound, "");
+                let sound_value = timeline_sound_value(sound.index, sound.x);
+                self.audio.play_sound(&mut self.reader, sound_value, "");
             }
         } else {
             log::warn!("Failed to load frame {}", frame);
