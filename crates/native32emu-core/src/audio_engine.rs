@@ -3,8 +3,11 @@
 use crate::file_loader::{AudioFormat, Colorspace, Native32Reader};
 #[cfg(not(feature = "standalone"))]
 use symphonia::core::{
-    audio::SampleBuffer, codecs::DecoderOptions, errors::Error as SymphoniaError,
-    formats::FormatOptions, io::MediaSourceStream, meta::MetadataOptions, probe::Hint,
+    codecs::{audio::AudioDecoderOptions, CodecParameters},
+    errors::Error as SymphoniaError,
+    formats::{probe::Hint, FormatOptions, TrackType},
+    io::MediaSourceStream,
+    meta::MetadataOptions,
 };
 
 #[cfg(feature = "standalone")]
@@ -656,21 +659,28 @@ fn decode_mp3(data: &[u8], output_rate: u32) -> anyhow::Result<Vec<i16>> {
     let stream = MediaSourceStream::new(source, Default::default());
     let mut hint = Hint::new();
     hint.with_extension("mp3");
-    let probed = symphonia::default::get_probe()
-        .format(
+    let mut format = symphonia::default::get_probe()
+        .probe(
             &hint,
             stream,
-            &FormatOptions::default(),
-            &MetadataOptions::default(),
+            FormatOptions::default(),
+            MetadataOptions::default(),
         )
         .map_err(|error| anyhow::anyhow!("failed to probe MP3 stream: {error}"))?;
-    let mut format = probed.format;
     let track = format
-        .default_track()
+        .default_track(TrackType::Audio)
         .ok_or_else(|| anyhow::anyhow!("MP3 stream has no audio track"))?;
     let track_id = track.id;
+    let codec_params = track
+        .codec_params
+        .clone()
+        .ok_or_else(|| anyhow::anyhow!("MP3 track has no codec parameters"))?;
+    let audio_codec_params = match codec_params {
+        CodecParameters::Audio(params) => params,
+        _ => return Err(anyhow::anyhow!("MP3 track is not an audio track")),
+    };
     let mut decoder = symphonia::default::get_codecs()
-        .make(&track.codec_params, &DecoderOptions::default())
+        .make_audio_decoder(&audio_codec_params, &AudioDecoderOptions::default())
         .map_err(|error| anyhow::anyhow!("failed to create MP3 decoder: {error}"))?;
 
     let mut decoded = Vec::new();
@@ -678,7 +688,8 @@ fn decode_mp3(data: &[u8], output_rate: u32) -> anyhow::Result<Vec<i16>> {
     let mut channel_count = 0;
     loop {
         let packet = match format.next_packet() {
-            Ok(packet) => packet,
+            Ok(Some(packet)) => packet,
+            Ok(None) => break, // End of stream
             Err(SymphoniaError::IoError(error))
                 if error.kind() == std::io::ErrorKind::UnexpectedEof =>
             {
@@ -689,7 +700,7 @@ fn decode_mp3(data: &[u8], output_rate: u32) -> anyhow::Result<Vec<i16>> {
             }
             Err(error) => return Err(anyhow::anyhow!("failed to read MP3 packet: {error}")),
         };
-        if packet.track_id() != track_id {
+        if packet.track_id != track_id {
             continue;
         }
         let audio = match decoder.decode(&packet) {
@@ -705,18 +716,16 @@ fn decode_mp3(data: &[u8], output_rate: u32) -> anyhow::Result<Vec<i16>> {
             }
             Err(error) => return Err(anyhow::anyhow!("failed to decode MP3 packet: {error}")),
         };
-        let spec = *audio.spec();
+        let spec = audio.spec();
         if sample_rate == 0 {
-            sample_rate = spec.rate;
-            channel_count = spec.channels.count();
-        } else if sample_rate != spec.rate || channel_count != spec.channels.count() {
+            sample_rate = spec.rate();
+            channel_count = spec.channels().count();
+        } else if sample_rate != spec.rate() || channel_count != spec.channels().count() {
             return Err(anyhow::anyhow!(
                 "MP3 stream changed audio format while decoding"
             ));
         }
-        let mut sample_buffer = SampleBuffer::<f32>::new(audio.capacity() as u64, spec);
-        sample_buffer.copy_interleaved_ref(audio);
-        decoded.extend_from_slice(sample_buffer.samples());
+        audio.copy_to_vec_interleaved(&mut decoded);
     }
 
     if sample_rate == 0 || channel_count == 0 || decoded.is_empty() {
