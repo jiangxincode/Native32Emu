@@ -504,6 +504,29 @@ fn magical_adventure_mp3_music_decodes_mixes_and_loops() {
 
 #[test]
 #[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
+fn basketball_keeps_background_music_during_gameplay() {
+    let dir = game_dir().expect("no game directory found");
+    let game = dir.join("ESPG/Basketba.smf");
+    let mut emu = Emulator::from_path(game, 100).expect("load Basketball");
+    emu.load_frame(1);
+    for frame in 0..1_800 {
+        let pressed = if frame >= 50 && (frame - 50) % 45 < 3 {
+            vec![KEY_Z]
+        } else {
+            vec![]
+        };
+        emu.set_buttons(&pressed);
+        emu.tick();
+        let _ = emu.get_pending_audio_samples();
+    }
+
+    assert!(
+        emu.audio.is_playing(),
+        "Basketball background music stopped during repeated shots"
+    );
+}
+#[test]
+#[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
 fn main_timeline_sound_objects_start_background_music() {
     let dir = game_dir().expect("no game directory found");
     for relative in ["ESPG/Basketba.smf", "EPUZ/Mouse.smf"] {
