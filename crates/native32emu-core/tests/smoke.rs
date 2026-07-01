@@ -13,6 +13,7 @@
 
 use std::path::{Path, PathBuf};
 
+use native32emu_core::action_vm::VmHost;
 use native32emu_core::emulator::Emulator;
 
 /// Number of frames to run per game before sampling the output.
@@ -279,6 +280,56 @@ fn gunfire_menu_advances_on_confirm() {
         !final_name.eq_ignore_ascii_case("GFSTART.SSL"),
         "menu did not advance after holding confirm: still on {final_name} \
          (selection animation appears frozen)"
+    );
+}
+
+#[test]
+#[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
+fn metal_storm_continue_loads_next_content() {
+    let dir = game_dir().expect("no game directory found");
+    let source_start = find_asset(&dir, "MSSTART.ssl").expect("MSSTART.ssl not found");
+    let source_over = find_asset(&dir, "MSOVER.ssl").expect("MSOVER.ssl not found");
+    let source_next = find_asset(&dir, "MSPLAY10.ssl").expect("MSPLAY10.ssl not found");
+
+    let temp = tempfile::tempdir().expect("create temporary game directory");
+    let metal_dir = temp.path().join("NA32SSL/ENGLISH/METAL");
+    std::fs::create_dir_all(&metal_dir).expect("create Metal Storm directory");
+    let game_over = metal_dir.join("MSOVER.ssl");
+    let game_start = metal_dir.join("MSSTART.ssl");
+    let next_game = metal_dir.join("MSPLAY10.ssl");
+    std::fs::copy(source_over, &game_over).expect("copy MSOVER.ssl");
+    std::fs::copy(source_start, &game_start).expect("copy MSSTART.ssl");
+    std::fs::copy(source_next, &next_game).expect("copy MSPLAY10.ssl");
+    std::fs::write(format!("{}.ssl_sav", game_start.display()), "|1|1|10|0|00")
+        .expect("seed Metal Storm save data");
+
+    let mut emu = Emulator::from_path(game_start, 100).expect("load Metal Storm start screen");
+    VmHost::get_url(
+        &mut emu,
+        "/NA32SSL /ENGLISH /METAL   /MSOVER.ssl",
+        "SSL+SSL_PlayNext",
+    );
+    emu.tick();
+    for frame in 0..240 {
+        let pressed = if (60..63).contains(&frame) {
+            vec![KEY_Z]
+        } else {
+            vec![]
+        };
+        emu.set_buttons(&pressed);
+        emu.tick();
+        emu.draw();
+    }
+
+    let final_name = emu
+        .filename
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("");
+    assert!(
+        final_name.eq_ignore_ascii_case("MSPLAY10.ssl"),
+        "continue loaded {final_name} instead of MSPLAY10.ssl: {:?}",
+        emu.vm.vars
     );
 }
 

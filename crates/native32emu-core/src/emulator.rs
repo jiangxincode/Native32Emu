@@ -586,7 +586,15 @@ impl Emulator {
         // Load new file
         let data = std::fs::read(&fullpath)
             .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", fullpath.display(), e))?;
-        self.save_manager = SaveManager::new(&fullpath);
+        let is_ssl = |path: &Path| {
+            path.extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("ssl"))
+        };
+        // Consecutive SSL scenes belong to one game and share its save data.
+        if !is_ssl(&self.filename) || !is_ssl(&fullpath) {
+            self.save_manager = SaveManager::new(&fullpath);
+        }
         self.filename = fullpath;
         self.reader = Native32Reader::new(data);
         self.reader.init()?;
