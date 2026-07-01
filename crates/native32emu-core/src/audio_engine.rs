@@ -686,6 +686,7 @@ fn decode_mp3(data: &[u8], output_rate: u32) -> anyhow::Result<Vec<i16>> {
     let mut decoded = Vec::new();
     let mut sample_rate = 0;
     let mut channel_count = 0;
+    let mut temp_buf = Vec::new();
     loop {
         let packet = match format.next_packet() {
             Ok(Some(packet)) => packet,
@@ -725,7 +726,10 @@ fn decode_mp3(data: &[u8], output_rate: u32) -> anyhow::Result<Vec<i16>> {
                 "MP3 stream changed audio format while decoding"
             ));
         }
-        audio.copy_to_vec_interleaved(&mut decoded);
+        // Use temp_buf to accumulate samples, then extend decoded
+        temp_buf.clear();
+        audio.copy_to_vec_interleaved(&mut temp_buf);
+        decoded.extend_from_slice(&temp_buf);
     }
 
     if sample_rate == 0 || channel_count == 0 || decoded.is_empty() {
