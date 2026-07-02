@@ -254,7 +254,7 @@ impl Emulator {
         let movie_advancements: Vec<(String, isize)> = {
             let mut advancements = Vec::new();
             for (name, movie) in self.sprites.iter_mut() {
-                if !movie.playing || movie.next_frame.is_some() || movie.sound_channel.is_some() {
+                if !movie.playing || movie.next_frame.is_some() {
                     continue;
                 }
                 let movie_frames = self.reader.get_movie(movie.movie);
@@ -594,6 +594,14 @@ impl Emulator {
         // Consecutive SSL scenes belong to one game and share its save data.
         if !is_ssl(&self.filename) || !is_ssl(&fullpath) {
             self.save_manager = SaveManager::new(&fullpath);
+        }
+        if !fullpath.starts_with(&self.content_root) {
+            self.content_root = self
+                .content_root
+                .ancestors()
+                .find(|ancestor| fullpath.starts_with(ancestor))
+                .context("switched content has no common root with the initial content")?
+                .to_path_buf();
         }
         self.filename = fullpath;
         self.reader = Native32Reader::new(data);

@@ -576,6 +576,67 @@ fn basketball_keeps_background_music_during_gameplay() {
         "Basketball background music stopped during repeated shots"
     );
 }
+
+#[test]
+#[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
+fn mission_express_fire1_recovers_control_after_jump() {
+    let dir = game_dir().expect("no game directory found");
+    let game = find_asset(&dir, "FIRE1.SSL").expect("FIRE1.SSL not found");
+    let mut emu = Emulator::from_path(game, 100).expect("load Mission Express Fire1");
+
+    let mut saw_uncontrollable_jump = false;
+    for frame in 0..360 {
+        emu.set_buttons(&[]);
+        emu.tick();
+        let _ = emu.get_pending_audio_samples();
+        if frame == 300 {
+            let jump_frame = emu.vm.vars["pcarsf5"].parse::<u32>().unwrap();
+            emu.vm.vars.insert("pcarstate".into(), "0".into());
+            emu.vm.vars.insert("barstate".into(), "7".into());
+            VmHost::goto_frame(&mut emu, "pcar", jump_frame, true);
+        }
+        if frame > 300
+            && emu
+                .vm
+                .vars
+                .get("pcarstate")
+                .is_some_and(|state| state == "0")
+        {
+            saw_uncontrollable_jump = true;
+        }
+    }
+
+    assert!(saw_uncontrollable_jump, "test did not enter the jump state");
+    assert_eq!(
+        emu.vm.vars.get("pcarstate").map(String::as_str),
+        Some("1"),
+        "fire truck did not return to its controllable state after the jump"
+    );
+}
+
+#[test]
+#[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
+fn mission_express_save_state_survives_cross_directory_content_switch() {
+    let dir = game_dir().expect("no game directory found");
+    let game = dir.join("EPOP/EExpress.smf");
+    let mut emu = Emulator::from_path(game, 100).expect("load Mission Express launcher");
+
+    emu.frame_player.take_next_frame();
+    emu.frame_player.playing = false;
+    emu.content_loader
+        .queue_load("/NA32SSL /ENGLISH /MEXPRESS/FIRE1.SSL");
+    emu.tick();
+
+    let mut state = vec![0; emu.serialize_size()];
+    emu.serialize(&mut state)
+        .expect("save state after switching from EPOP to NA32SSL");
+    emu.deserialize(&state)
+        .expect("restore state after switching from EPOP to NA32SSL");
+    assert_eq!(
+        emu.filename.file_name().and_then(|name| name.to_str()),
+        Some("FIRE1.SSL")
+    );
+}
 #[test]
 #[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
 fn main_timeline_sound_objects_start_background_music() {
