@@ -112,9 +112,6 @@ impl SpriteSystem {
             if !movie.playing || movie.next_frame.is_some() {
                 continue;
             }
-            if movie.sound_channel.is_some() {
-                continue;
-            }
             // Half framerate: advance every other tick
             if tick_count.is_multiple_of(2) {
                 movie.next_frame = Some(movie.frame as isize + 1);
@@ -334,6 +331,19 @@ mod tests {
         assert!(!ms.cloned);
         assert!(ms.sound_channel.is_none());
         assert_eq!(ms.next_frame, Some(0));
+    }
+
+    #[test]
+    fn test_sound_does_not_pause_movie_timeline() {
+        let mut ss = SpriteSystem::new();
+        let mut movie = MovieState::new(1, 0, 0, 0);
+        movie.next_frame = None;
+        movie.sound_channel = Some(7);
+        ss.insert("movie".to_string(), movie);
+
+        ss.tick(2);
+
+        assert_eq!(ss.get("movie").unwrap().next_frame, Some(1));
     }
 
     #[test]
