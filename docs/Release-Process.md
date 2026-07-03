@@ -67,7 +67,7 @@ Pushing the tag triggers `.github/workflows/release.yml`, which:
 
 1. Go to [Releases](https://github.com/jiangxincode/Native32Emu/releases)
 2. Find the draft release created by CI
-3. Review the auto-generated changelog — edit if needed
+3. Review the auto-generated changelog — edit if needed(可以参考之前正式发布版本的 changelog)
 4. Verify all expected artifacts are attached:
    - `native32-emu-linux-x86_64.tar.gz`
    - `native32-emu-macos-x86_64.tar.gz`
