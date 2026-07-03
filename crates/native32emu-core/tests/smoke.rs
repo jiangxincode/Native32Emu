@@ -714,3 +714,53 @@ fn zip_file_loads_fhui() {
         "ZIP-loaded FHUI.smf produced a blank frame"
     );
 }
+/// A placed Pirate bomb must start at the template's first visible frame.
+#[test]
+#[ignore = "requires local Native32 game assets (set NATIVE32_GAME_DIR)"]
+fn pirate_bomb_plays_and_explodes() {
+    let dir = game_dir().expect("no game directory found");
+    let game = dir.join("EPOP/Epirate.smf");
+
+    let tap_frames = [80, 220, 360, 500, 640];
+    let emu = run_scripted(&game, 650, |frame| {
+        if tap_frames
+            .iter()
+            .any(|start| (*start..*start + 3).contains(&frame))
+        {
+            vec![KEY_Z]
+        } else {
+            vec![]
+        }
+    })
+    .expect("run Pirate");
+
+    let bomb = emu.sprites.get("B1").expect("bomb clone was not created");
+    assert!(bomb.visible, "placed bomb clone is hidden");
+    assert!(bomb.playing, "placed bomb clone is not playing");
+    assert!(
+        bomb.frame < 10,
+        "placed bomb started at the hidden template frame: {}",
+        bomb.frame
+    );
+
+    let emu = run_scripted(&game, 770, |frame| {
+        if tap_frames
+            .iter()
+            .any(|start| (*start..*start + 3).contains(&frame))
+        {
+            vec![KEY_Z]
+        } else {
+            vec![]
+        }
+    })
+    .expect("run Pirate through bomb explosion");
+
+    assert!(
+        emu.sprites.get("B1").is_none(),
+        "bomb clone did not remove itself after exploding"
+    );
+    assert_eq!(
+        emu.vm.vars.get("btotal").map(String::as_str),
+        Some("|00000")
+    );
+}
