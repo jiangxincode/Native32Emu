@@ -69,7 +69,7 @@ All 84 Native32 games in the test suite load and run without fatal errors. Each 
 | 2 | 极速任务 | Express | tmp/native32_game/EPOP/EExpress.smf | ![极速任务](images/EPOP/EExpress.png) | 类赛车多角色游戏，含城市、高速、荒野、F1 赛道场景，有障碍物和道具。 | ✅ Pass |
 | 3 | 枪火 | Gun Fire | tmp/native32_game/EPOP/EGUNFIRE.smf | ![枪火](images/EPOP/EGUNFIRE.png) | 横版射击（STG）游戏。骑上心爱的机车，拿起火枪，在枪火纷飞的世界去打击黑社会，对抗独裁者，消灭生化怪兽。 | ✅ Pass |
 | 4 | 钢铁风暴 | Metal Storm | tmp/native32_game/EPOP/EMETAL.smf | ![钢铁风暴](images/EPOP/EMETAL.png) | 四向自由卷轴射击游戏。游戏虚构了一个近未来的世界，军事科技以现实世界科技为基础有一定发展，武器与现实世界相似。 | ✅ Pass |
-| 5 | 海盗 | Pirate | tmp/native32_game/EPOP/Epirate.smf | ![海盗](images/EPOP/Epirate.png) | 以"炸弹人"为原型的休闲桌面（PUZ）游戏。小海盗雷克获得藏宝图后开启冒险，炸弹可正常放置、显示并自动爆炸。 | ✅ Pass |
+| 5 | 海盗 | Pirate | tmp/native32_game/EPOP/Epirate.smf | ![海盗](images/EPOP/Epirate.png) | 以"炸弹人"为原型的休闲桌面（PUZ）游戏。小海盗雷克获得藏宝图后开启冒险。 | ✅ Pass |
 | 6 | 符文之语 | Rune Word | tmp/native32_game/EPOP/ERuneWod.smf | ![符文之语](images/EPOP/ERuneWod.png) | 类似于对对碰的游戏。年轻的魔法学徒艾莉进入炼金房修炼，在大魔导师雷斯林的指导下学习一个又一个的魔法。各种符文代表不同属性的魔力。 | ✅ Pass |
 | 7 | 风暴之翼 | Storm | tmp/native32_game/EPOP/ESTORM.smf | ![风暴之翼](images/EPOP/ESTORM.png) | 纵版射击（STG）游戏。王牌飞行员 Jason 和 Blanche 深入 239 区侦察，遭遇敌方终极战机及隐藏秘密武器。 | ✅ Pass |
 | 8 | 汉语学堂一 | School 1 | tmp/native32_game/EPOP/SCHOOL1.smf | ![汉语学堂一](images/EPOP/SCHOOL1.png) | 中英文双语学习（ELA）软件，全 3D 图画，涵盖服装、水果、室内、身体、头部、野餐六大类。 | ✅ Pass |
