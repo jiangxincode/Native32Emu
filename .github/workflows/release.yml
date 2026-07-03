@@ -17,6 +17,9 @@ jobs:
           - platform: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
             artifact: native32-emu-linux-x86_64
+          - platform: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            artifact: native32-emu-linux-aarch64
           - platform: macos-latest
             target: x86_64-apple-darwin
             artifact: native32-emu-macos-x86_64
@@ -271,6 +274,7 @@ jobs:
 
             ### Standalone emulator
             - **Linux x86_64**: `native32-emu-linux-x86_64.tar.gz`
+            - **Linux aarch64**: `native32-emu-linux-aarch64.tar.gz`
             - **macOS x86_64**: `native32-emu-macos-x86_64.tar.gz`
             - **macOS aarch64**: `native32-emu-macos-aarch64.tar.gz`
             - **Windows x86_64**: `native32-emu-windows-x86_64.zip`
