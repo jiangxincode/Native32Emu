@@ -869,9 +869,9 @@ impl VmHost for Emulator {
             let mut new_state = MovieState::new(orig.movie, orig.x, orig.y, depth as u16);
             new_state.frame = 0;
             new_state.visible = true;
-            new_state.playing = orig.playing;
+            new_state.playing = true;
             new_state.cloned = true;
-            new_state.next_frame = Some(orig.frame as isize);
+            new_state.next_frame = Some(0);
             self.sprites.insert(dest.to_string(), new_state);
         }
     }
