@@ -275,9 +275,76 @@ jobs:
           path: native32-emu-ios-libretro.tar.gz
           retention-days: 7
 
+  build-webos:
+    name: Build libretro (webOS)
+    runs-on: ubuntu-22.04
+    env:
+      WEBOS_TOOLCHAIN_URL: https://github.com/openlgtv/buildroot-nc4/releases/latest/download/arm-webos-linux-gnueabi_sdk-buildroot-x86_64.tar.gz
+      RUST_TARGET: armv7-unknown-linux-gnueabi
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: armv7-unknown-linux-gnueabi
+
+      - name: Cache Rust artifacts
+        uses: swatinem/rust-cache@v2
+        with:
+          key: nightly-webos
+
+      - name: Install webOS native toolchain
+        shell: bash
+        run: |
+          curl --fail --location --retry 3 \
+            "$WEBOS_TOOLCHAIN_URL" \
+            --output "$RUNNER_TEMP/webos-toolchain.tar.gz"
+          mkdir -p "$RUNNER_TEMP/webos-toolchain"
+          tar xzf "$RUNNER_TEMP/webos-toolchain.tar.gz" \
+            -C "$RUNNER_TEMP/webos-toolchain" --strip-components=1
+          "$RUNNER_TEMP/webos-toolchain/relocate-sdk.sh"
+          echo "$RUNNER_TEMP/webos-toolchain/bin" >> "$GITHUB_PATH"
+          echo "WEBOS_TOOLCHAIN=$RUNNER_TEMP/webos-toolchain" >> "$GITHUB_ENV"
+
+      - name: Build libretro core (webOS ARMv7)
+        env:
+          CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABI_LINKER: arm-webos-linux-gnueabi-gcc
+          CC_armv7_unknown_linux_gnueabi: arm-webos-linux-gnueabi-gcc
+          AR_armv7_unknown_linux_gnueabi: arm-webos-linux-gnueabi-ar
+        run: cargo build -p native32emu-libretro --release --target "$RUST_TARGET"
+
+      - name: Verify and stage libretro core (webOS)
+        shell: bash
+        run: |
+          core="target/$RUST_TARGET/release/libnative32emu.so"
+          arm-webos-linux-gnueabi-readelf -h "$core"
+          arm-webos-linux-gnueabi-readelf -d "$core"
+
+          out="libretro/native32-emu-webos"
+          mkdir -p "$out"
+          cp "$core" "$out/native32emu_libretro.so"
+          cp crates/native32emu-libretro/native32emu_libretro.info "$out/"
+          ls -la "$out"
+
+      - name: Package libretro (webOS)
+        shell: bash
+        run: |
+          cd libretro
+          tar czf ../native32-emu-webos-libretro.tar.gz native32-emu-webos
+          cd ..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: native32-emu-webos
+          path: native32-emu-webos-libretro.tar.gz
+          retention-days: 7
+
   release:
     name: Publish Nightly Release
-    needs: [build, build-android, build-ios]
+    needs: [build, build-android, build-ios, build-webos]
     runs-on: ubuntu-latest
     steps:
       - name: Compute version metadata
@@ -325,6 +392,7 @@ jobs:
           - Includes the standalone emulator and the libretro core (\`*-libretro.*\`) for RetroArch
           - Android libretro core (\`native32-emu-android-libretro.tar.gz\`) with arm64-v8a, armeabi-v7a, x86 and x86_64 ABIs
           - iOS libretro core (\`native32-emu-ios-libretro.tar.gz\`) for real devices (arm64) and simulators
+          - webOS libretro core (\`native32-emu-webos-libretro.tar.gz\`) for ARMv7 TVs
 
           ⚠️ Unsigned build: Windows SmartScreen / macOS Gatekeeper may block on first launch.
           EOF
