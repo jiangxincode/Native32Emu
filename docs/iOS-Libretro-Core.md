@@ -67,10 +67,12 @@ The Native32 core should now appear in the core list automatically.
 
 ### Using a pre-built IPA (quick start)
 
-If you prefer not to modify the IPA yourself, `celiocasttro` has provided a RetroArch 1.17.0 IPA with the Native32 core pre-injected:
+If you prefer not to modify the IPA yourself, `celiocasttro` has provided RetroArch 1.17.0 IPAs with the Native32 core pre-injected:
 
-- Download: https://www.mediafire.com/file/k7zyijk7eo2pfjh/RetroArch_v1.17.0_26205.ipa/file
-- Video tutorial: https://youtu.be/MDoS2ir9cnI
+- **Native32Emu v1.1.0**: https://www.mediafire.com/file/k7zyijk7eo2pfjh/RetroArch_v1.17.0_26205.ipa/file
+- **Native32Emu v1.2.0**: https://www.mediafire.com/file/k368op318p00vkq/native32-emu-ios_retroarch.ipa/file
+
+Video tutorial: https://youtu.be/MDoS2ir9cnI
 
 ### Troubleshooting
 
