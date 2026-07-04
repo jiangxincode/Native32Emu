@@ -128,3 +128,4 @@ If you run into issues installing this core on iOS, the following threads may he
 
 - [#58](https://github.com/jiangxincode/Native32Emu/issues/58)
 - [#71](https://github.com/jiangxincode/Native32Emu/issues/71)
+- [#78](https://github.com/jiangxincode/Native32Emu/issues/78)
