@@ -17,6 +17,7 @@ Version numbers must be updated in **two files**:
 |------|-------|---------|
 | `Cargo.toml` (workspace root) | `[workspace.package] version` | `"0.1.0"` |
 | `crates/native32emu-libretro/native32emu_libretro.info` | `display_version` | `"0.1.0"` |
+| `crates\native32emu-libretro\src\libretro\api.rs` | `library_version` | `"0.1.0"` |
 
 Both values must match. The `.info` file is copied directly into the release
 artifacts — RetroArch reads `display_version` to display the core version to
