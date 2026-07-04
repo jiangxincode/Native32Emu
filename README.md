@@ -56,24 +56,31 @@ menu. Selecting a game launches it; pressing **ESC** during gameplay returns to
 the menu. Pressing ESC on the menu itself exits the emulator. When loading a
 `.smf` file directly, ESC exits as usual.
 
-### RetroArch Mode
+### RetroArch Mode (Desktop: Windows / Linux / macOS)
 
 Native32Emu can be used as a libretro core with RetroArch, allowing you to play Native32 games with RetroArch's features like shaders, netplay, and achievements.
 
-1. **Download the libretro core** from the [Releases](https://github.com/jiangxincode/Native32Emu/releases) page
-2. **Install the core**:
-   - Copy `native32emu_libretro.dll` (or `.so`/`.dylib`) to RetroArch's `cores/` directory
-   - Copy `native32emu_libretro.info` to RetroArch's `info/` directory
-3. **Load the core in RetroArch**:
-   - Open RetroArch
-   - Select "Load Core" → "Native32 (Native32Emu)"
-   - Select "Load Content" and choose a `.smf`, `.sgm`, `.ssl`, or `.zip` game file
+**Install the core** — choose one of the following methods:
+
+- **Online Updater**: Open RetroArch → **Main Menu → Online Updater → Core Downloader** → select **Native32 (Native32Emu)**
+- **Manual**: Download the core from the [Releases](https://github.com/jiangxincode/Native32Emu/releases) page, copy `native32emu_libretro.dll` (or `.so`/`.dylib`) to RetroArch's `cores/` directory, and `native32emu_libretro.info` to the `info/` directory
+
+**Load the core in RetroArch**:
+
+1. Open RetroArch
+2. Select "Load Core" → "Native32 (Native32Emu)"
+3. Select "Load Content" and choose a `.smf`, `.sgm`, `.ssl`, or `.zip` game file
 
 #### RetroArch on Android
 
 The libretro core also runs on Android and can be reused by most Android
 RetroArch-based frontends. See [Android Libretro Core](docs/Android-Libretro-Core.md)
 for install and build instructions.
+
+#### RetroArch on iOS
+
+The libretro core also runs on iOS (iPhone / iPad). iOS currently requires manual core injection — see
+[iOS Libretro Core](docs/iOS-Libretro-Core.md) for install and build instructions.
 
 #### Supported Features
 
@@ -134,6 +141,7 @@ on Windows (`libnative32emu.so` on Linux, `libnative32emu.dylib` on macOS) under
 RetroArch's `cores/` directory.
 
 For Android cross-compilation, see [Android Libretro Core](docs/Android-Libretro-Core.md).
+For iOS, see [iOS Libretro Core](docs/iOS-Libretro-Core.md).
 
 ## Testing
 
