@@ -368,6 +368,10 @@ impl Emulator {
         self.cheats.set_debug_logging(enabled, interval_frames);
     }
 
+    pub fn set_cheat_debug_variable_filter(&mut self, filter: Option<&str>) {
+        self.cheats.set_debug_variable_filter(filter);
+    }
+
     fn apply_cheats(&mut self) {
         self.cheats
             .apply(&mut self.vm, &mut self.sprites, &mut self.frame_player);

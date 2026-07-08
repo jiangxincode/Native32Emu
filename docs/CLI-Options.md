@@ -31,6 +31,7 @@ native32-emu [OPTIONS] <GAME_PATH>
 | `--cheat <RULE>` | string | — | Enable a cheat rule. Repeatable. |
 | `--debug-cheats` | flag | off | Periodically log VM variables and sprites to help build cheat rules. |
 | `--cheat-debug-interval <N>` | integer | `30` | Frames between cheat target debug logs. |
+| `--cheat-debug-filter <GLOB>` | string | all | Only log VM variable names matching a case-sensitive glob (`*` and `?`). |
 | `-S, --screenshot <PATH>` | path | — | Render some frames, save a PNG screenshot, then exit. |
 | `--screenshot-frames <N>` | integer | `30` | Number of frames to run before the screenshot is taken. |
 | `--show-gamepad` | flag | off | Draw an on-screen virtual gamepad overlay showing pressed keys. |
@@ -85,11 +86,12 @@ Supported rule forms:
 
 Boolean values accept `1`/`0`, `true`/`false`, `on`/`off`, and `yes`/`no`.
 
-To discover usable targets, run with `--debug-cheats`. The log lists current VM variables and sprite names/fields that can be used in `var:` and `sprite:` rules.
+To discover usable targets, run with `--debug-cheats`. The log lists current VM variables and sprite names/fields that can be used in `var:` and `sprite:` rules. Use `--cheat-debug-filter` to restrict variable names with a case-sensitive glob.
 
 ```bash
 native32-emu --cheat "var:lives=99" game.smf
 native32-emu --cheat "sprite:player.visible=0" game.smf
+native32-emu --debug-cheats --cheat-debug-filter "p_*" game.smf
 ```
 
 ## Keypad Auto-Repeat (`--repeat-delay` / `--repeat-period`)

@@ -125,6 +125,7 @@ fn main() -> Result<()> {
     }
 
     emu.set_cheat_debug_logging(cli.debug_cheats, cli.cheat_debug_interval);
+    emu.set_cheat_debug_variable_filter(cli.cheat_debug_filter.as_deref());
     // Apply typematic key-repeat timing (matches the hardware keypad driver).
     emu.input
         .set_repeat_timing(cli.repeat_delay, cli.repeat_period);

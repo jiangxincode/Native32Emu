@@ -61,10 +61,11 @@ pub struct CheatSlot {
     pub rule: CheatRule,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CheatDebugConfig {
     pub enabled: bool,
     pub interval_frames: u64,
+    pub variable_filter: Option<String>,
 }
 
 impl Default for CheatDebugConfig {
@@ -72,6 +73,7 @@ impl Default for CheatDebugConfig {
         Self {
             enabled: false,
             interval_frames: CheatManager::DEFAULT_DEBUG_INTERVAL_FRAMES,
+            variable_filter: None,
         }
     }
 }
@@ -140,7 +142,15 @@ impl CheatManager {
         self.debug = CheatDebugConfig {
             enabled,
             interval_frames: interval_frames.max(1),
+            variable_filter: self.debug.variable_filter.clone(),
         };
+    }
+
+    pub fn set_debug_variable_filter(&mut self, filter: Option<&str>) {
+        self.debug.variable_filter = filter
+            .map(str::trim)
+            .filter(|filter| !filter.is_empty())
+            .map(str::to_owned);
     }
 
     pub fn debug_logging_enabled(&self) -> bool {
@@ -149,6 +159,10 @@ impl CheatManager {
 
     pub fn debug_interval_frames(&self) -> u64 {
         self.debug.interval_frames
+    }
+
+    pub fn debug_variable_filter(&self) -> Option<&str> {
+        self.debug.variable_filter.as_deref()
     }
 
     pub fn maybe_log_targets(
@@ -169,10 +183,15 @@ impl CheatManager {
             frame.playing,
             format_option(frame.next_frame)
         );
+        let filter = self.debug.variable_filter.as_deref();
+        let filter_label = filter
+            .map(|pattern| format!(" matching '{pattern}'"))
+            .unwrap_or_default();
         log::info!(
-            "Cheat targets @ tick {}: vars {}",
+            "Cheat targets @ tick {}: vars{} {}",
             tick_count,
-            format_vars(&vm.vars, Self::DEBUG_LIST_LIMIT)
+            filter_label,
+            format_vars(&vm.vars, filter, Self::DEBUG_LIST_LIMIT)
         );
         log::info!(
             "Cheat targets @ tick {}: sprites {}",
@@ -305,12 +324,15 @@ impl FrameField {
     }
 }
 
-fn format_vars(vars: &HashMap<String, String>, limit: usize) -> String {
+fn format_vars(vars: &HashMap<String, String>, filter: Option<&str>, limit: usize) -> String {
     if vars.is_empty() {
         return "[]".to_string();
     }
 
-    let mut entries: Vec<_> = vars.iter().collect();
+    let mut entries: Vec<_> = vars
+        .iter()
+        .filter(|(name, _)| filter.is_none_or(|pattern| glob_matches(pattern, name)))
+        .collect();
     entries.sort_by_key(|(name, _)| *name);
     let omitted = entries.len().saturating_sub(limit);
     let mut parts: Vec<String> = entries
@@ -322,6 +344,34 @@ fn format_vars(vars: &HashMap<String, String>, limit: usize) -> String {
         parts.push(format!("... {omitted} more"));
     }
     format!("[{}]", parts.join(", "))
+}
+
+fn glob_matches(pattern: &str, value: &str) -> bool {
+    let pattern = pattern.as_bytes();
+    let value = value.as_bytes();
+    let (mut pattern_index, mut value_index) = (0, 0);
+    let (mut star_index, mut star_value_index) = (None, 0);
+
+    while value_index < value.len() {
+        if pattern_index < pattern.len()
+            && (pattern[pattern_index] == b'?' || pattern[pattern_index] == value[value_index])
+        {
+            pattern_index += 1;
+            value_index += 1;
+        } else if pattern_index < pattern.len() && pattern[pattern_index] == b'*' {
+            star_index = Some(pattern_index);
+            pattern_index += 1;
+            star_value_index = value_index;
+        } else if let Some(star) = star_index {
+            pattern_index = star + 1;
+            star_value_index += 1;
+            value_index = star_value_index;
+        } else {
+            return false;
+        }
+    }
+
+    pattern[pattern_index..].iter().all(|byte| *byte == b'*')
 }
 
 fn format_sprites(sprites: &SpriteSystem, limit: usize) -> String {
@@ -428,13 +478,20 @@ mod tests {
         cheats.set_debug_logging(true, 0);
         assert!(cheats.debug_logging_enabled());
         assert_eq!(cheats.debug_interval_frames(), 1);
+
+        cheats.set_debug_variable_filter(Some(" p_* "));
+        assert_eq!(cheats.debug_variable_filter(), Some("p_*"));
+        cheats.set_debug_variable_filter(Some(""));
+        assert_eq!(cheats.debug_variable_filter(), None);
     }
 
     #[test]
     fn formats_discoverable_targets() {
         let mut vars = HashMap::new();
         vars.insert("lives".to_string(), "3".to_string());
-        assert_eq!(format_vars(&vars, 64), "[lives=3]");
+        vars.insert("p_hp".to_string(), "10".to_string());
+        assert_eq!(format_vars(&vars, None, 64), "[lives=3, p_hp=10]");
+        assert_eq!(format_vars(&vars, Some("p_*"), 64), "[p_hp=10]");
 
         let mut sprites = SpriteSystem::new();
         sprites.insert("hero".to_string(), MovieState::new(7, 12, 34, 5));
@@ -442,6 +499,15 @@ mod tests {
         assert!(formatted.contains("hero(movie=7"));
         assert!(formatted.contains("x=12"));
         assert!(formatted.contains("y=34"));
+    }
+
+    #[test]
+    fn matches_debug_variable_globs() {
+        assert!(glob_matches("p_*", "p_hp"));
+        assert!(glob_matches("e_hp?", "e_hp0"));
+        assert!(glob_matches("*score*", "highscore"));
+        assert!(!glob_matches("p_*", "player_hp"));
+        assert!(!glob_matches("e_hp?", "e_hp10"));
     }
 
     #[test]
