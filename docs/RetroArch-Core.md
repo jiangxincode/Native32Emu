@@ -78,7 +78,17 @@ held.
 
 Native32Emu uses RetroArch's **Emulator** cheat handler. Native32Emu rules are
 sent to the core through the libretro cheat interface; they are not RetroArch
-memory-address cheats.
+memory-address cheats. The code strings use the same syntax as the standalone
+emulator:
+
+- `var:<name>=<value>` - force a Native32 VM variable.
+- `sprite:<name>.<field>=<value>` or `movie:<name>.<field>=<value>` - force a
+  movie sprite field. Supported fields are `x`, `y`, `depth`, `frame`,
+  `visible`, and `playing`.
+- `frame:goto=<n>` - force the main timeline to jump to a frame.
+- `frame:playing=<bool>` - force the main timeline play/pause state.
+
+Boolean values accept `1`/`0`, `true`/`false`, `on`/`off`, and `yes`/`no`.
 
 1. Load a game and open **Quick Menu > Cheats**.
 2. Select **Add New Code to Top** or **Add New Code to Bottom**.

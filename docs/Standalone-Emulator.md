@@ -108,8 +108,9 @@ with a warning.
 
 Verified game-specific rules are listed in [Game Cheat Codes](Cheat-Codes.md).
 
-Use `--cheat <RULE>` to apply a shared core cheat rule. The option is
-repeatable, and rules are applied every emulation tick after normal game logic.
+Use `--cheat <RULE>` to apply a cheat rule. The option is repeatable, and rules
+are applied every emulation tick after normal game logic. The RetroArch core
+accepts the same rules through its emulator-handled cheat interface.
 
 Supported rule forms:
 
