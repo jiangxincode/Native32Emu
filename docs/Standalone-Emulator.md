@@ -1,8 +1,40 @@
-# Command-line Options
+# Standalone Emulator
 
-This document describes every command-line option of the standalone
-`native32-emu` binary, the default key mappings, key remapping, and how to tune
-the keypad auto-repeat (which controls mechanics such as walk → run).
+This guide covers installing and running the standalone `native32-emu` binary,
+loading individual games or ZIP packages, keyboard controls, cheats, display
+scaling, and every command-line option.
+
+## Installation
+
+Download the latest standalone binary for your platform from the
+[Releases](https://github.com/jiangxincode/Native32Emu/releases) page.
+
+You can also build it from source:
+
+```bash
+cargo build -p native32emu --release
+```
+
+The binary is produced at `target/release/native32-emu` (`.exe` on Windows).
+
+## Loading Games
+
+The standalone emulator accepts `.smf`, `.sgm`, `.ssl`, and `.zip` files.
+
+```bash
+# Load a game directly
+native32-emu path/to/game.smf
+
+# Load a ZIP package containing FHUI.smf
+native32-emu path/to/game.zip
+```
+
+### ZIP Mode
+
+When loading from a `.zip` file, the emulator starts the FHUI menu. Selecting a
+game launches it; pressing **ESC** during gameplay returns to the menu. Pressing
+**ESC** on the menu itself exits the emulator. When loading a `.smf` file
+directly, **ESC** exits as usual.
 
 You can always print the built-in help with:
 
@@ -73,6 +105,8 @@ Supported key names: `a`–`z`, `0`–`9`, `space`, `enter`/`return`,
 with a warning.
 
 ## Cheats
+
+Verified game-specific rules are listed in [Game Cheat Codes](Cheat-Codes.md).
 
 Use `--cheat <RULE>` to apply a shared core cheat rule. The option is
 repeatable, and rules are applied every emulation tick after normal game logic.

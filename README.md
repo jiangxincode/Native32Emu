@@ -23,7 +23,7 @@ Native32 is a game format developed by Sunplus for DVD player and TV chipsets (c
 - **YUV & ARGB image decoding** — with packbits/RLE decompression and color space conversion
 - **Action bytecode VM** — 36 opcodes covering arithmetic, logic, string ops, control flow, sprites, and I/O
 - **Sprite/movie system** — animation, cloning, visibility control, depth-sorted rendering
-- **Audio playback** — MP3 music and raw 16-bit PCM sound effects
+- **Audio playback** — finite/infinite-loop MP3 music mixed with raw 16-bit PCM sound effects (11025Hz for YUV games, 22050Hz for ARGB games), output as stereo with mono sources duplicated across both channels
 - **MPEG-1 cutscenes** — pure-Rust MPEG-1 video + MP2 audio decoder plays `SSL_PlayNext` logo/cutscene videos (no C dependency); skippable with A/B
 - **ZIP archive support** — load game packages directly from `.zip` files (auto-extracts and loads FHUI.smf)
 - **Keyboard input** — configurable key remapping
@@ -36,83 +36,24 @@ Native32 is a game format developed by Sunplus for DVD player and TV chipsets (c
 
 ### Standalone Mode
 
-Download the latest binary from the [Releases](https://github.com/jiangxincode/Native32Emu/releases) page.
-
-The basic usage is listed below, but there are many more options for controlling the behavior of the emulator. See the [Command-line Options](docs/CLI-Options.md) documentation for the full list of options.
+Download the latest binary from the
+[Releases](https://github.com/jiangxincode/Native32Emu/releases) page and run:
 
 ```bash
-# Basic usage
 native32-emu path/to/game.smf
-
-# Load from ZIP archive (auto-extracts and loads FHUI.smf)
-native32-emu path/to/game.zip
-
-# Fullscreen mode
-native32-emu --fullscreen game.smf
 ```
 
-**ZIP mode**: When loading from a `.zip` file, the emulator starts the FHUI
-menu. Selecting a game launches it; pressing **ESC** during gameplay returns to
-the menu. Pressing ESC on the menu itself exits the emulator. When loading a
-`.smf` file directly, ESC exits as usual.
+See the [Standalone Emulator](docs/Standalone-Emulator.md) guide for
+installation, ZIP menu behavior, keyboard controls, cheats, display settings,
+and all command-line options.
 
-### RetroArch Mode (Desktop: Windows / Linux / macOS)
+### RetroArch Mode
 
-Native32Emu can be used as a libretro core with RetroArch, allowing you to play Native32 games with RetroArch's features like shaders, netplay, and achievements.
+Install **Native32 (Native32Emu)** from RetroArch's Core Downloader, or install
+the release files manually, then load a supported game through **Load Content**.
 
-**Install the core** — choose one of the following methods:
-
-- **Online Updater**: Open RetroArch → **Main Menu → Online Updater → Core Downloader** → select **Native32 (Native32Emu)**
-- **Manual**: Download the core from the [Releases](https://github.com/jiangxincode/Native32Emu/releases) page, copy `native32emu_libretro.dll` (or `.so`/`.dylib`) to RetroArch's `cores/` directory, and `native32emu_libretro.info` to the `info/` directory
-
-**Load the core in RetroArch**:
-
-1. Open RetroArch
-2. Select "Load Core" → "Native32 (Native32Emu)"
-3. Select "Load Content" and choose a `.smf`, `.sgm`, `.ssl`, or `.zip` game file
-
-#### RetroArch on Android
-
-The libretro core also runs on Android and can be reused by most Android
-RetroArch-based frontends. See [Android Libretro Core](docs/Android-Libretro-Core.md)
-for install and build instructions.
-
-#### RetroArch on iOS
-
-The libretro core also runs on iOS (iPhone / iPad). iOS currently requires manual core injection — see
-[iOS Libretro Core](docs/iOS-Libretro-Core.md) for install and build instructions.
-
-#### Supported Features
-
-- ✅ Video output (XRGB8888 pixel format)
-- ✅ Audio output (looping MP3 music mixed with RAW PCM sound effects, stereo)
-- ✅ Input handling (D-Pad + A/B buttons)
-- ✅ Game loading (.smf, .sgm, .ssl, .zip files)
-- ✅ Save states
-- ✅ Core options (audio volume, key auto-repeat timing, swap A/B, auto-skip cutscenes)
-
-#### Core Options
-
-Configurable from RetroArch's *Quick Menu → Core Options* (audio volume, key
-auto-repeat timing, swap A/B, auto-skip cutscenes). See
-[Core Options](docs/Core-Options.md) for the full list.
-
-#### RetroPad Button Mapping
-
-| RetroPad Button | Native32 Keycode | Action |
-|----------------|------------------|--------|
-| D-Pad Left | 0x0200 | Left |
-| D-Pad Right | 0x0400 | Right |
-| D-Pad Up | 0x1c00 | Up |
-| D-Pad Down | 0x1e00 | Down |
-| A (SNES East) | 0x8800 | B / Menu |
-| B (SNES South) | 0x4000 | A |
-
-#### Audio Notes
-
-- **MP3**: Fully supported, including finite/infinite loops and simultaneous sound effects
-- **RAW PCM**: Fully supported (11025Hz for YUV games, 22050Hz for ARGB games)
-- Audio is output as stereo (mono sources are duplicated to both channels)
+See the [RetroArch Core](docs/RetroArch-Core.md) guide for installation,
+supported platforms and features, RetroPad mapping, core options, and cheats.
 
 ## Building
 

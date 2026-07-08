@@ -2,7 +2,7 @@
 
 This document lists game-specific cheat rules verified with Native32Emu. For the
 shared rule syntax and target discovery options, see
-[Command-line Options](CLI-Options.md#cheats).
+[Standalone Emulator](Standalone-Emulator.md#cheats).
 
 ## Blades of Red / EBBLADE (赤刃)
 

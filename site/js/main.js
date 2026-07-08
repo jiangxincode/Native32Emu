@@ -209,8 +209,8 @@
       'footer-contributing': '贡献指南',
       'footer-community': '社区',
       'footer-docs': '文档',
-      'footer-cli': 'CLI 选项',
-      'footer-core': '核心选项',
+      'footer-cli': '独立模拟器',
+      'footer-core': 'RetroArch Core',
       'footer-gamelist': '游戏列表',
       'footer-copy': 'BSD 3-Clause License &copy; 2025 Aloys. Built with 🦀 Rust.'
     },
@@ -303,8 +303,8 @@
       'footer-contributing': 'Contributing',
       'footer-community': 'Community',
       'footer-docs': 'Docs',
-      'footer-cli': 'CLI Options',
-      'footer-core': 'Core Options',
+      'footer-cli': 'Standalone Emulator',
+      'footer-core': 'RetroArch Core',
       'footer-gamelist': 'Game List',
       'footer-copy': 'BSD 3-Clause License &copy; 2025 Aloys. Built with 🦀 Rust.'
     }
