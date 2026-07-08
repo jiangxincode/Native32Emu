@@ -13,6 +13,7 @@ pub mod action_vm;
 pub mod actions;
 pub mod archive_loader;
 pub mod audio_engine;
+pub mod cheats;
 pub mod content_loader;
 pub mod dat_loader;
 pub mod des_constants;

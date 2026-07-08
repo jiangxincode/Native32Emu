@@ -2,6 +2,7 @@
 
 use crate::action_vm::{ActionProp, ActionVM, VmHost};
 use crate::audio_engine::AudioEngine;
+use crate::cheats::CheatManager;
 use crate::content_loader::ContentLoader;
 use crate::file_loader::{FrameObject, Native32Reader, ObjectType};
 use crate::frame_player::FramePlayer;
@@ -40,6 +41,7 @@ pub struct Emulator {
     pub renderer: Renderer,
     pub input: InputHandler,
     pub save_manager: SaveManager,
+    pub cheats: CheatManager,
     pub content_loader: ContentLoader,
     /// Front-end menu (FHUI) directory browser for the game-list host calls.
     pub file_browser: crate::file_browser::FileBrowser,
@@ -116,6 +118,7 @@ impl Emulator {
             renderer: Renderer::new(resolution.0, resolution.1),
             input: InputHandler::new(),
             save_manager,
+            cheats: CheatManager::new(),
             content_loader: ContentLoader::new(),
             file_browser: crate::file_browser::FileBrowser::new(),
             menu_context: None,
@@ -218,6 +221,7 @@ impl Emulator {
         // of the normal timeline.
         if self.is_cutscene_active() {
             self.cutscene_tick();
+            self.apply_cheats();
             self.time_ms += 1000 / 30;
             return;
         }
@@ -356,7 +360,13 @@ impl Emulator {
             }
         }
 
+        self.apply_cheats();
         self.time_ms += 1000 / 30;
+    }
+
+    fn apply_cheats(&mut self) {
+        self.cheats
+            .apply(&mut self.vm, &mut self.sprites, &mut self.frame_player);
     }
 
     /// Whether a cutscene video is currently playing or queued.

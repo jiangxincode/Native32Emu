@@ -118,6 +118,11 @@ fn main() -> Result<()> {
     let key_remappings = cli.parse_key_remappings();
     emu.input.remap(&key_remappings);
 
+    for cheat in &cli.cheats {
+        if let Err(e) = emu.cheats.add_code(cheat) {
+            log::warn!("Ignoring invalid cheat '{}': {}", cheat, e);
+        }
+    }
     // Apply typematic key-repeat timing (matches the hardware keypad driver).
     emu.input
         .set_repeat_timing(cli.repeat_delay, cli.repeat_period);

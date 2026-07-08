@@ -344,19 +344,48 @@ pub extern "C" fn retro_get_memory_size(_id: u32) -> usize {
 }
 
 // ============================================================
-// Cheat functions (not implemented)
+// Cheat functions
 // ============================================================
 
 /// Reset cheat codes
 #[no_mangle]
 pub extern "C" fn retro_cheat_reset() {
-    // Not implemented
+    unsafe {
+        if let Some(emu) = EMULATOR.as_mut() {
+            emu.cheats.clear();
+        }
+    }
 }
 
 /// Set a cheat code
 #[no_mangle]
-pub extern "C" fn retro_cheat_set(_index: u32, _enabled: bool, _code: *const std::ffi::c_char) {
-    // Not implemented
+pub extern "C" fn retro_cheat_set(index: u32, enabled: bool, code: *const std::ffi::c_char) {
+    unsafe {
+        let Some(emu) = EMULATOR.as_mut() else {
+            return;
+        };
+
+        let code = if code.is_null() {
+            ""
+        } else {
+            match CStr::from_ptr(code).to_str() {
+                Ok(code) => code,
+                Err(e) => {
+                    log::warn!("Ignoring invalid UTF-8 cheat at slot {}: {}", index, e);
+                    return;
+                }
+            }
+        };
+
+        if let Err(e) = emu.cheats.set_slot(index, enabled, code) {
+            log::warn!(
+                "Ignoring invalid cheat at slot {} ('{}'): {}",
+                index,
+                code,
+                e
+            );
+        }
+    }
 }
 
 /// Load a special game (not used)

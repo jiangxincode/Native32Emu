@@ -28,6 +28,7 @@ native32-emu [OPTIONS] <GAME_PATH>
 | `--auto-skip-cutscenes` | flag | off | Automatically skip logo/intro/cutscene videos instead of playing them. |
 | `--debug` | flag | off | Enable debug/development mode. |
 | `--remap <KEYCODE:KEY>` | string | — | Remap a Native32 keycode to a physical key. Repeatable. |
+| `--cheat <RULE>` | string | — | Enable a cheat rule. Repeatable. |
 | `-S, --screenshot <PATH>` | path | — | Render some frames, save a PNG screenshot, then exit. |
 | `--screenshot-frames <N>` | integer | `30` | Number of frames to run before the screenshot is taken. |
 | `--show-gamepad` | flag | off | Draw an on-screen virtual gamepad overlay showing pressed keys. |
@@ -67,6 +68,25 @@ native32-emu \
 Supported key names: `a`–`z`, `0`–`9`, `space`, `enter`/`return`,
 `left`, `right`, `up`, `down`, `escape`/`esc`. Invalid entries are ignored
 with a warning.
+
+## Cheats
+
+Use `--cheat <RULE>` to apply a shared core cheat rule. The option is
+repeatable, and rules are applied every emulation tick after normal game logic.
+
+Supported rule forms:
+
+- `var:<name>=<value>` — force a Native32 VM variable.
+- `sprite:<name>.<field>=<value>` or `movie:<name>.<field>=<value>` — force a movie sprite field. Supported fields: `x`, `y`, `depth`, `frame`, `visible`, `playing`.
+- `frame:goto=<n>` — force the main timeline to jump to a frame.
+- `frame:playing=<bool>` — force the main timeline play/pause state.
+
+Boolean values accept `1`/`0`, `true`/`false`, `on`/`off`, and `yes`/`no`.
+
+```bash
+native32-emu --cheat "var:lives=99" game.smf
+native32-emu --cheat "sprite:player.visible=0" game.smf
+```
 
 ## Keypad Auto-Repeat (`--repeat-delay` / `--repeat-period`)
 

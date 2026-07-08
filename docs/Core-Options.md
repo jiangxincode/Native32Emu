@@ -14,3 +14,9 @@ reloading the game.
 
 The auto-repeat options reproduce the original keypad's typematic behavior that
 some games rely on (e.g. walk vs. run on a held direction).
+
+## Cheats
+
+Cheats are exposed through RetroArch's cheat interface, not as a core option.
+Use *Quick Menu → Cheats* and enter shared Native32Emu cheat rules such as
+`var:lives=99` or `sprite:player.visible=0`.
