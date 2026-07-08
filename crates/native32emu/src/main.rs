@@ -123,6 +123,8 @@ fn main() -> Result<()> {
             log::warn!("Ignoring invalid cheat '{}': {}", cheat, e);
         }
     }
+
+    emu.set_cheat_debug_logging(cli.debug_cheats, cli.cheat_debug_interval);
     // Apply typematic key-repeat timing (matches the hardware keypad driver).
     emu.input
         .set_repeat_timing(cli.repeat_delay, cli.repeat_period);

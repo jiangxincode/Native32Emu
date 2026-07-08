@@ -29,6 +29,8 @@ native32-emu [OPTIONS] <GAME_PATH>
 | `--debug` | flag | off | Enable debug/development mode. |
 | `--remap <KEYCODE:KEY>` | string | — | Remap a Native32 keycode to a physical key. Repeatable. |
 | `--cheat <RULE>` | string | — | Enable a cheat rule. Repeatable. |
+| `--debug-cheats` | flag | off | Periodically log VM variables and sprites to help build cheat rules. |
+| `--cheat-debug-interval <N>` | integer | `30` | Frames between cheat target debug logs. |
 | `-S, --screenshot <PATH>` | path | — | Render some frames, save a PNG screenshot, then exit. |
 | `--screenshot-frames <N>` | integer | `30` | Number of frames to run before the screenshot is taken. |
 | `--show-gamepad` | flag | off | Draw an on-screen virtual gamepad overlay showing pressed keys. |
@@ -82,6 +84,8 @@ Supported rule forms:
 - `frame:playing=<bool>` — force the main timeline play/pause state.
 
 Boolean values accept `1`/`0`, `true`/`false`, `on`/`off`, and `yes`/`no`.
+
+To discover usable targets, run with `--debug-cheats`. The log lists current VM variables and sprite names/fields that can be used in `var:` and `sprite:` rules.
 
 ```bash
 native32-emu --cheat "var:lives=99" game.smf

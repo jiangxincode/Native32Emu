@@ -3,7 +3,7 @@
 use crate::action_vm::ActionVM;
 use crate::frame_player::FramePlayer;
 use crate::sprite_system::{MovieState, SpriteSystem};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::str::FromStr;
 use thiserror::Error;
 
@@ -61,12 +61,31 @@ pub struct CheatSlot {
     pub rule: CheatRule,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CheatDebugConfig {
+    pub enabled: bool,
+    pub interval_frames: u64,
+}
+
+impl Default for CheatDebugConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            interval_frames: CheatManager::DEFAULT_DEBUG_INTERVAL_FRAMES,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CheatManager {
     slots: BTreeMap<u32, CheatSlot>,
+    debug: CheatDebugConfig,
 }
 
 impl CheatManager {
+    pub const DEFAULT_DEBUG_INTERVAL_FRAMES: u64 = 30;
+    const DEBUG_LIST_LIMIT: usize = 64;
+
     pub fn new() -> Self {
         Self::default()
     }
@@ -115,6 +134,51 @@ impl CheatManager {
 
     pub fn is_empty(&self) -> bool {
         self.slots.is_empty()
+    }
+
+    pub fn set_debug_logging(&mut self, enabled: bool, interval_frames: u64) {
+        self.debug = CheatDebugConfig {
+            enabled,
+            interval_frames: interval_frames.max(1),
+        };
+    }
+
+    pub fn debug_logging_enabled(&self) -> bool {
+        self.debug.enabled
+    }
+
+    pub fn debug_interval_frames(&self) -> u64 {
+        self.debug.interval_frames
+    }
+
+    pub fn maybe_log_targets(
+        &self,
+        tick_count: u64,
+        vm: &ActionVM,
+        sprites: &SpriteSystem,
+        frame: &FramePlayer,
+    ) {
+        if !self.debug.enabled || !tick_count.is_multiple_of(self.debug.interval_frames) {
+            return;
+        }
+
+        log::info!(
+            "Cheat targets @ tick {}: frame current={} playing={} next={}",
+            tick_count,
+            frame.current_frame,
+            frame.playing,
+            format_option(frame.next_frame)
+        );
+        log::info!(
+            "Cheat targets @ tick {}: vars {}",
+            tick_count,
+            format_vars(&vm.vars, Self::DEBUG_LIST_LIMIT)
+        );
+        log::info!(
+            "Cheat targets @ tick {}: sprites {}",
+            tick_count,
+            format_sprites(sprites, Self::DEBUG_LIST_LIMIT)
+        );
     }
 
     pub fn apply(&self, vm: &mut ActionVM, sprites: &mut SpriteSystem, frame: &mut FramePlayer) {
@@ -241,6 +305,60 @@ impl FrameField {
     }
 }
 
+fn format_vars(vars: &HashMap<String, String>, limit: usize) -> String {
+    if vars.is_empty() {
+        return "[]".to_string();
+    }
+
+    let mut entries: Vec<_> = vars.iter().collect();
+    entries.sort_by_key(|(name, _)| *name);
+    let omitted = entries.len().saturating_sub(limit);
+    let mut parts: Vec<String> = entries
+        .into_iter()
+        .take(limit)
+        .map(|(name, value)| format!("{name}={value}"))
+        .collect();
+    if omitted > 0 {
+        parts.push(format!("... {omitted} more"));
+    }
+    format!("[{}]", parts.join(", "))
+}
+
+fn format_sprites(sprites: &SpriteSystem, limit: usize) -> String {
+    let mut entries: Vec<_> = sprites.iter().collect();
+    if entries.is_empty() {
+        return "[]".to_string();
+    }
+
+    entries.sort_by_key(|(name, _)| *name);
+    let omitted = entries.len().saturating_sub(limit);
+    let mut parts: Vec<String> = entries
+        .into_iter()
+        .take(limit)
+        .map(|(name, movie)| {
+            format!(
+                "{}(movie={} x={} y={} depth={} frame={} visible={} playing={} next={})",
+                name,
+                movie.movie,
+                movie.x,
+                movie.y,
+                movie.depth,
+                movie.frame,
+                movie.visible,
+                movie.playing,
+                format_option(movie.next_frame)
+            )
+        })
+        .collect();
+    if omitted > 0 {
+        parts.push(format!("... {omitted} more"));
+    }
+    format!("[{}]", parts.join(", "))
+}
+
+fn format_option<T: ToString>(value: Option<T>) -> String {
+    value.map_or_else(|| "none".to_string(), |value| value.to_string())
+}
 fn parse_bool(value: &str) -> bool {
     match value.trim().to_ascii_lowercase().as_str() {
         "" | "0" | "false" | "off" | "no" => false,
@@ -296,6 +414,34 @@ mod tests {
                 value: "0".to_string()
             }
         );
+    }
+
+    #[test]
+    fn configures_debug_logging() {
+        let mut cheats = CheatManager::new();
+        assert!(!cheats.debug_logging_enabled());
+        assert_eq!(
+            cheats.debug_interval_frames(),
+            CheatManager::DEFAULT_DEBUG_INTERVAL_FRAMES
+        );
+
+        cheats.set_debug_logging(true, 0);
+        assert!(cheats.debug_logging_enabled());
+        assert_eq!(cheats.debug_interval_frames(), 1);
+    }
+
+    #[test]
+    fn formats_discoverable_targets() {
+        let mut vars = HashMap::new();
+        vars.insert("lives".to_string(), "3".to_string());
+        assert_eq!(format_vars(&vars, 64), "[lives=3]");
+
+        let mut sprites = SpriteSystem::new();
+        sprites.insert("hero".to_string(), MovieState::new(7, 12, 34, 5));
+        let formatted = format_sprites(&sprites, 64);
+        assert!(formatted.contains("hero(movie=7"));
+        assert!(formatted.contains("x=12"));
+        assert!(formatted.contains("y=34"));
     }
 
     #[test]

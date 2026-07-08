@@ -364,9 +364,15 @@ impl Emulator {
         self.time_ms += 1000 / 30;
     }
 
+    pub fn set_cheat_debug_logging(&mut self, enabled: bool, interval_frames: u64) {
+        self.cheats.set_debug_logging(enabled, interval_frames);
+    }
+
     fn apply_cheats(&mut self) {
         self.cheats
             .apply(&mut self.vm, &mut self.sprites, &mut self.frame_player);
+        self.cheats
+            .maybe_log_targets(self.tick_count, &self.vm, &self.sprites, &self.frame_player);
     }
 
     /// Whether a cutscene video is currently playing or queued.
