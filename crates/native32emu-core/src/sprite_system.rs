@@ -108,7 +108,7 @@ impl SpriteSystem {
 
     /// Advance movie frames. Movies run at half the main framerate.
     pub fn tick(&mut self, tick_count: u64) {
-        for (_, movie) in self.sprites.iter_mut() {
+        for movie in self.sprites.values_mut() {
             if !movie.playing || movie.next_frame.is_some() {
                 continue;
             }
