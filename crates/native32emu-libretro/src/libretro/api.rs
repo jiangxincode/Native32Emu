@@ -430,14 +430,6 @@ fn set_core_options() {
             key: c"native32emu_auto_skip_cutscenes".as_ptr(),
             value: c"Auto-skip cutscene videos; disabled|enabled".as_ptr(),
         },
-        retro_variable {
-            key: c"native32emu_cheat_debug_log".as_ptr(),
-            value: c"Cheat target debug logging; disabled|enabled".as_ptr(),
-        },
-        retro_variable {
-            key: c"native32emu_cheat_debug_interval".as_ptr(),
-            value: c"Cheat debug interval (frames); 30|15|60|120|300".as_ptr(),
-        },
         // Terminator
         retro_variable {
             key: ptr::null(),
@@ -505,13 +497,6 @@ fn apply_core_options(emu: &mut Emulator) {
     if let Some(skip) = get_core_option(c"native32emu_auto_skip_cutscenes") {
         emu.set_auto_skip_cutscenes(skip == "enabled");
     }
-
-    let cheat_debug =
-        get_core_option(c"native32emu_cheat_debug_log").is_some_and(|value| value == "enabled");
-    let cheat_debug_interval = get_core_option(c"native32emu_cheat_debug_interval")
-        .and_then(|value| value.parse::<u64>().ok())
-        .unwrap_or(native32emu_core::cheats::CheatManager::DEFAULT_DEBUG_INTERVAL_FRAMES);
-    emu.set_cheat_debug_logging(cheat_debug, cheat_debug_interval);
 }
 
 /// Register input descriptors with the frontend

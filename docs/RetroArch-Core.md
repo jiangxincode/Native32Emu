@@ -67,8 +67,6 @@ without reloading the game.
 | Key auto-repeat period (frames) | 1-10 | 3 | Frames between auto-repeat pulses (~0.1s at 30fps) |
 | Swap A/B buttons | disabled / enabled | disabled | Swaps the A and B button actions |
 | Auto-skip cutscene videos | disabled / enabled | disabled | Skips logo, intro, and cutscene videos automatically |
-| Cheat target debug logging | disabled / enabled | disabled | Periodically logs VM variables and sprites to help build cheat rules |
-| Cheat debug interval (frames) | 15-300 | 30 | Frames between cheat target debug logs |
 
 The auto-repeat options reproduce the original keypad's typematic behavior,
 which some games use to distinguish walking from running while a direction is
@@ -97,8 +95,8 @@ Boolean values accept `1`/`0`, `true`/`false`, `on`/`off`, and `yes`/`no`.
 5. Set **Enabled** to **On**.
 6. Return to the Cheats menu and select **Apply Changes**.
 
-Enable **Cheat target debug logging** when you need to discover variable and
-sprite names in the core log. Verified game-specific rules are listed in
+Use the standalone emulator's cheat debug options when you need to discover
+variable and sprite names. Verified game-specific rules are listed in
 [Game Cheat Codes](Cheat-Codes.md).
 
 See the official
