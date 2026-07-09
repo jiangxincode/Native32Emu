@@ -41,6 +41,22 @@ pub struct Cli {
     #[arg(long = "remap", value_name = "KEYCODE:KEY")]
     pub key_remappings: Vec<String>,
 
+    /// Cheat rule to enable, e.g. "var:lives=99" or "sprite:player.visible=0"
+    #[arg(long = "cheat", value_name = "RULE")]
+    pub cheats: Vec<String>,
+
+    /// Log VM variables and sprite targets periodically to help build cheat rules
+    #[arg(long = "debug-cheats")]
+    pub debug_cheats: bool,
+
+    /// Frames between cheat target debug logs
+    #[arg(long = "cheat-debug-interval", default_value = "30", value_parser = clap::value_parser!(u64).range(1..))]
+    pub cheat_debug_interval: u64,
+
+    /// Only log VM variable names matching this glob pattern (supports '*' and '?')
+    #[arg(long = "cheat-debug-filter", value_name = "GLOB")]
+    pub cheat_debug_filter: Option<String>,
+
     /// Take a screenshot after N frames and exit (saves as PNG)
     #[arg(short = 'S', long = "screenshot", value_name = "PATH")]
     pub screenshot: Option<PathBuf>,

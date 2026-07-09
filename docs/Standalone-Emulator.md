@@ -1,8 +1,40 @@
-# Command-line Options
+# Standalone Emulator
 
-This document describes every command-line option of the standalone
-`native32-emu` binary, the default key mappings, key remapping, and how to tune
-the keypad auto-repeat (which controls mechanics such as walk → run).
+This guide covers installing and running the standalone `native32-emu` binary,
+loading individual games or ZIP packages, keyboard controls, cheats, display
+scaling, and every command-line option.
+
+## Installation
+
+Download the latest standalone binary for your platform from the
+[Releases](https://github.com/jiangxincode/Native32Emu/releases) page.
+
+You can also build it from source:
+
+```bash
+cargo build -p native32emu --release
+```
+
+The binary is produced at `target/release/native32-emu` (`.exe` on Windows).
+
+## Loading Games
+
+The standalone emulator accepts `.smf`, `.sgm`, `.ssl`, and `.zip` files.
+
+```bash
+# Load a game directly
+native32-emu path/to/game.smf
+
+# Load a ZIP package containing FHUI.smf
+native32-emu path/to/game.zip
+```
+
+### ZIP Mode
+
+When loading from a `.zip` file, the emulator starts the FHUI menu. Selecting a
+game launches it; pressing **ESC** during gameplay returns to the menu. Pressing
+**ESC** on the menu itself exits the emulator. When loading a `.smf` file
+directly, **ESC** exits as usual.
 
 You can always print the built-in help with:
 
@@ -28,6 +60,10 @@ native32-emu [OPTIONS] <GAME_PATH>
 | `--auto-skip-cutscenes` | flag | off | Automatically skip logo/intro/cutscene videos instead of playing them. |
 | `--debug` | flag | off | Enable debug/development mode. |
 | `--remap <KEYCODE:KEY>` | string | — | Remap a Native32 keycode to a physical key. Repeatable. |
+| `--cheat <RULE>` | string | — | Enable a cheat rule. Repeatable. |
+| `--debug-cheats` | flag | off | Periodically log VM variables and sprites to help build cheat rules. |
+| `--cheat-debug-interval <N>` | integer | `30` | Frames between cheat target debug logs. |
+| `--cheat-debug-filter <GLOB>` | string | all | Only log VM variable names matching a case-sensitive glob (`*` and `?`). |
 | `-S, --screenshot <PATH>` | path | — | Render some frames, save a PNG screenshot, then exit. |
 | `--screenshot-frames <N>` | integer | `30` | Number of frames to run before the screenshot is taken. |
 | `--show-gamepad` | flag | off | Draw an on-screen virtual gamepad overlay showing pressed keys. |
@@ -67,6 +103,31 @@ native32-emu \
 Supported key names: `a`–`z`, `0`–`9`, `space`, `enter`/`return`,
 `left`, `right`, `up`, `down`, `escape`/`esc`. Invalid entries are ignored
 with a warning.
+
+## Cheats
+
+Verified game-specific rules are listed in [Game Cheat Codes](Cheat-Codes.md).
+
+Use `--cheat <RULE>` to apply a cheat rule. The option is repeatable, and rules
+are applied every emulation tick after normal game logic. The RetroArch core
+accepts the same rules through its emulator-handled cheat interface.
+
+Supported rule forms:
+
+- `var:<name>=<value>` — force a Native32 VM variable.
+- `sprite:<name>.<field>=<value>` or `movie:<name>.<field>=<value>` — force a movie sprite field. Supported fields: `x`, `y`, `depth`, `frame`, `visible`, `playing`.
+- `frame:goto=<n>` — force the main timeline to jump to a frame.
+- `frame:playing=<bool>` — force the main timeline play/pause state.
+
+Boolean values accept `1`/`0`, `true`/`false`, `on`/`off`, and `yes`/`no`.
+
+To discover usable targets, run with `--debug-cheats`. The log lists current VM variables and sprite names/fields that can be used in `var:` and `sprite:` rules. Use `--cheat-debug-filter` to restrict variable names with a case-sensitive glob.
+
+```bash
+native32-emu --cheat "var:lives=99" game.smf
+native32-emu --cheat "sprite:player.visible=0" game.smf
+native32-emu --debug-cheats --cheat-debug-filter "p_*" game.smf
+```
 
 ## Keypad Auto-Repeat (`--repeat-delay` / `--repeat-period`)
 
