@@ -164,8 +164,8 @@
       'feat-dual-desc': '平台无关的核心引擎 + 独立的 Standalone 和 RetroArch 前端，共享 100% 模拟逻辑。',
       'feat-zip-title': 'ZIP 包加载',
       'feat-zip-desc': '直接加载 .zip 游戏包，自动解压并启动 FHUI 主菜单，还原原始的游戏浏览体验。',
-      'feat-des-title': 'DES 解密',
-      'feat-des-desc': '实现完整的 DES ECB 头部解密，还原 Sunplus 自定义加密的游戏文件头。',
+      'feat-des-title': '金手指系统',
+      'feat-des-desc': '运行时修改 VM 变量、精灵属性和帧状态，支持调试日志发现可用目标，轻松实现无限生命、跳关等作弊效果。',
       'feat-retro-title': 'RetroArch 核心',
       'feat-retro-desc': '完整的 libretro 核心，支持 RetroPad 映射、核心选项、着色器、网络对战等 RetroArch 生态功能。',
       // gallery
@@ -182,9 +182,6 @@
       'arch-core': '核心引擎',
       'arch-core-sub': '平台无关的库',
       'arch-platforms': '目标平台',
-      // code
-      'code-title': '纯 Rust，零妥协',
-      'code-subtitle': '从 MPEG-1 解码到 DES 加密，全部用 Rust 从零实现',
       // quickstart
       'qs-title': '快速开始',
       'qs-subtitle': '几行命令，即刻体验',
@@ -258,8 +255,8 @@
       'feat-dual-desc': 'A platform-independent core engine with separate Standalone and RetroArch frontends, sharing 100% of the emulation logic.',
       'feat-zip-title': 'ZIP Archive Loading',
       'feat-zip-desc': 'Load .zip game packages directly — auto-extract and launch the FHUI main menu for the original browsing experience.',
-      'feat-des-title': 'DES Decryption',
-      'feat-des-desc': 'Full DES ECB header decryption implementation, decoding Sunplus\'s custom-encrypted game file headers.',
+      'feat-des-title': 'Cheat System',
+      'feat-des-desc': 'Modify VM variables, sprite properties, and frame state at runtime. Debug logging helps discover cheat targets for infinite lives, level skips, and more.',
       'feat-retro-title': 'RetroArch Core',
       'feat-retro-desc': 'A complete libretro core with RetroPad mapping, core options, shaders, netplay, and the full RetroArch ecosystem.',
       // gallery
@@ -276,9 +273,6 @@
       'arch-core': 'Core Engine',
       'arch-core-sub': 'Platform-independent library',
       'arch-platforms': 'Platforms',
-      // code
-      'code-title': 'Pure Rust, Zero Compromise',
-      'code-subtitle': 'From MPEG-1 decoding to DES encryption — everything built from scratch in Rust',
       // quickstart
       'qs-title': 'Quick Start',
       'qs-subtitle': 'A few commands to get started',

@@ -171,8 +171,8 @@
           <div class="feature-icon">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
           </div>
-          <h3 data-i18n="feat-des-title">DES 解密</h3>
-          <p data-i18n="feat-des-desc">实现完整的 DES ECB 头部解密，还原 Sunplus 自定义加密的游戏文件头。</p>
+          <h3 data-i18n="feat-des-title">金手指系统</h3>
+          <p data-i18n="feat-des-desc">运行时修改 VM 变量、精灵属性和帧状态，支持调试日志发现可用目标，轻松实现无限生命、跳关等作弊效果。</p>
         </div>
         <div class="feature-card fade-in-up">
           <div class="feature-icon">
@@ -233,7 +233,7 @@
                 <span>Image Decoder</span>
                 <span>File Loader</span>
                 <span>Sprite System</span>
-                <span>DES Decrypt</span>
+                <span>Cheats</span>
               </div>
             </div>
           </div>
@@ -251,66 +251,6 @@
             <div class="arch-box small-box">Linux</div>
             <div class="arch-box small-box">Android</div>
           </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ====== CODE SHOWCASE ====== -->
-  <section id="code" class="section section-dark">
-    <div class="container">
-      <h2 class="section-title fade-in-up" data-i18n="code-title">纯 Rust，零妥协</h2>
-      <p class="section-subtitle fade-in-up" data-i18n="code-subtitle">从 MPEG-1 解码到 DES 加密，全部用 Rust 从零实现</p>
-      <div class="code-showcase fade-in-up">
-        <div class="code-block">
-          <div class="code-header">
-            <span class="code-dot red"></span>
-            <span class="code-dot yellow"></span>
-            <span class="code-dot green"></span>
-            <span class="code-filename">action_vm.rs</span>
-          </div>
-          <pre><code><span class="kw">pub enum</span> <span class="type">Action</span> {
-    <span class="comment">// Arithmetic</span>
-    <span class="fn">Add</span>, <span class="fn">Sub</span>, <span class="fn">Mul</span>, <span class="fn">Div</span>, <span class="fn">Modulo</span>,
-    <span class="comment">// Comparison</span>
-    <span class="fn">Less</span>, <span class="fn">Greater</span>, <span class="fn">Equal</span>,
-    <span class="comment">// Control Flow</span>
-    <span class="fn">Jump</span>, <span class="fn">JumpIf</span>, <span class="fn">Call</span>, <span class="fn">Return</span>,
-    <span class="comment">// Sprite &amp; Movie</span>
-    <span class="fn">CreateSprite</span>, <span class="fn">CloneSprite</span>,
-    <span class="fn">SetVisible</span>, <span class="fn">GotoFrame</span>,
-    <span class="comment">// I/O</span>
-    <span class="fn">PlaySound</span>, <span class="fn">PlayMusic</span>,
-    <span class="fn">StopSound</span>, <span class="fn">StopMusic</span>,
-    <span class="comment">// ... 36 opcodes total</span>
-}</code></pre>
-        </div>
-        <div class="code-block">
-          <div class="code-header">
-            <span class="code-dot red"></span>
-            <span class="code-dot yellow"></span>
-            <span class="code-dot green"></span>
-            <span class="code-filename">mpeg/video.rs</span>
-          </div>
-          <pre><code><span class="comment">// Pure-Rust MPEG-1 video decoder</span>
-<span class="comment">// Ported from PL_MPEG — zero C dependencies</span>
-
-<span class="kw">pub struct</span> <span class="type">Mpeg1Decoder</span> {
-    buffer: <span class="type">BitBuffer</span>,
-    block: [<span class="type">i16</span>; <span class="num">64</span>],
-    dc_predictor: [<span class="type">i16</span>; <span class="num">3</span>],
-    quantizer_matrix: [[<span class="type">u8</span>; <span class="num">64</span>]; <span class="num">2</span>],
-}
-
-<span class="kw">impl</span> <span class="type">Mpeg1Decoder</span> {
-    <span class="kw">pub fn</span> <span class="fn">decode_frame</span>(
-        &amp;<span class="kw">mut</span> <span class="kw">self</span>,
-        frame: &amp;<span class="kw">mut</span> [<span class="type">u8</span>],
-    ) -> <span class="type">Result</span>&lt;()&gt; {
-        <span class="comment">// Full MPEG-1 I/B/P frame decode</span>
-        <span class="comment">// IDCT, motion compensation, YUV→RGB</span>
-    }
-}</code></pre>
         </div>
       </div>
     </div>
