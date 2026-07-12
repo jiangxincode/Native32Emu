@@ -7,6 +7,7 @@
 <p align="center">
   <a href="https://jiangxincode.github.io/Native32Emu/"><img src="https://img.shields.io/badge/Website-Native32Emu-E8553A?logo=githubpages&logoColor=white" alt="Website"></a>
   <a href="https://github.com/jiangxincode/Native32Emu/actions/workflows/ci.yml"><img src="https://github.com/jiangxincode/Native32Emu/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://git.libretro.com/libretro/native32emu/-/pipelines"><img src="https://img.shields.io/gitlab/pipeline-status/native32emu?gitlab_url=https%3A%2F%2Fgit.libretro.com%2Flibretro&branch=master&logo=gitlab&label=Pipeline%20Status" alt="Gitlab Pipeline Status" ></a>
   <a href="https://github.com/jiangxincode/Native32Emu/releases/latest"><img src="https://img.shields.io/github/v/release/jiangxincode/Native32Emu" alt="Release"></a>
   <a href="https://github.com/jiangxincode/Native32Emu/releases"><img src="https://img.shields.io/github/downloads/jiangxincode/Native32Emu/total" alt="Downloads"></a>
   <a href="https://sonarcloud.io/dashboard?id=jiangxincode_Native32Emu"><img src="https://sonarcloud.io/api/project_badges/measure?project=jiangxincode_Native32Emu&metric=alert_status" alt="Quality Gate Status"></a>
